@@ -1,0 +1,83 @@
+/* =============================================================================
+ * MODÈLE D'ADDON STROK  —  copiez ce fichier pour démarrer le vôtre.
+ * =============================================================================
+ *
+ * Un addon est un simple fichier JavaScript (extension « .strokaddon »). Il n'y
+ * a AUCUNE étape de build : vous l'écrivez, vous le partagez, l'utilisateur
+ * l'importe depuis Strok via : rail de gauche → icône Extensions → « Importer ».
+ *
+ * Votre script reçoit un objet `module`. Renseignez-y deux choses :
+ *
+ *     module.manifest = { id, name, version, author, description };
+ *     module.activate = function (strok) { ... };
+ *
+ * (`module.exports = { manifest, activate }` fonctionne aussi.)
+ *
+ * `activate(strok)` est appelé une fois au chargement. Renvoyez éventuellement
+ * { deactivate() {} } pour nettoyer quand l'addon est désactivé/supprimé.
+ *
+ * --- API `strok` -------------------------------------------------------------
+ *  Pinceau / outil :
+ *    strok.getColor() / strok.setColor('#rrggbb')
+ *    strok.getTool()  / strok.setTool('pencil' | 'eraser')
+ *    strok.getSize()  / strok.setSize(px)
+ *    strok.getOpacity() / strok.setOpacity(0..1)
+ *
+ *  Calque actif :
+ *    strok.getContext()      -> CanvasRenderingContext2D (transform dpr posée ;
+ *                               on dessine en px CSS). null si aucun calque.
+ *    strok.getCanvasInfo()   -> { width, height (px physiques), dpr,
+ *                                 doc:{ x, y, w, h } (px CSS) }
+ *    strok.commit()          -> à appeler APRÈS avoir dessiné : valide l'édition
+ *                               dans l'historique undo/redo.
+ *
+ *  Contributions :
+ *    strok.addCommand({ id, label, run })   -> bouton dans le panneau Extensions
+ *                                              et la modale. Renvoie une fonction
+ *                                              de retrait.
+ *
+ *  Événements (renvoient une fonction de désabonnement) :
+ *    strok.on('strokeEnd',   () => {})       // après chaque trait validé
+ *    strok.on('colorChange', (hex) => {})    // couleur changée
+ *    strok.on('toolChange',  (id) => {})     // outil changé
+ *
+ *  Divers :
+ *    strok.notify('message', 'info' | 'success' | 'error')
+ *    strok.storage.get(key, fallback) / .set(key, value) / .remove(key)
+ *    strok.version           // version de l'app hôte
+ *    strok.manifest          // votre propre manifeste (raccourci)
+ *
+ * --- Bac à sable / sécurité --------------------------------------------------
+ *  Le code tourne dans le renderer : PAS d'accès Node, PAS d'accès direct au
+ *  système de fichiers, et la CSP interdit toute connexion réseau sortante.
+ *  N'installez que des addons dont vous avez confiance dans la source.
+ * ========================================================================== */
+
+module.manifest = {
+  id: 'com.exemple.mon-addon', // identifiant unique (style reverse-DNS conseillé)
+  name: 'Mon addon',
+  version: '1.0.0',
+  author: 'Votre nom',
+  description: 'Décrivez en une phrase ce que fait votre addon.',
+};
+
+module.activate = function (strok) {
+  strok.addCommand({
+    id: 'hello',
+    label: 'Dire bonjour',
+    run: () => {
+      strok.notify(`Bonjour ! Couleur courante : ${strok.getColor()}`);
+    },
+  });
+
+  // Exemple d'écouteur d'événement.
+  const off = strok.on('strokeEnd', () => {
+    // ... réagir à la fin d'un trait ...
+  });
+
+  return {
+    deactivate: () => {
+      off(); // se désabonner proprement
+    },
+  };
+};

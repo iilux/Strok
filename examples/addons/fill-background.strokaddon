@@ -1,0 +1,36 @@
+/* Strok addon — Remplir le fond
+ * Ajoute une commande qui peint toute la zone du calque actif avec la couleur
+ * et l'opacité courantes. Bon exemple minimal de contribution de commande. */
+
+module.manifest = {
+  id: 'strok.example.fill-background',
+  name: 'Remplir le fond',
+  version: '1.0.0',
+  author: 'Strok',
+  description:
+    "Ajoute une commande qui remplit tout le calque actif avec la couleur courante.",
+};
+
+module.activate = function (strok) {
+  strok.addCommand({
+    id: 'fill',
+    label: 'Remplir avec la couleur',
+    run: () => {
+      const ctx = strok.getContext();
+      const info = strok.getCanvasInfo();
+      if (!ctx || !info) {
+        strok.notify('Aucun calque actif', 'error');
+        return;
+      }
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = strok.getOpacity();
+      ctx.fillStyle = strok.getColor();
+      // doc.w / doc.h sont en px CSS : la transform dpr est déjà posée.
+      ctx.fillRect(0, 0, info.doc.w, info.doc.h);
+      ctx.restore();
+      strok.commit(); // rend l'action annulable (Ctrl+Z)
+      strok.notify('Fond rempli');
+    },
+  });
+};
