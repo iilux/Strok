@@ -1,0 +1,844 @@
+/* ============================================================
+   Strok — système de style global
+   Dark, minimaliste, icônes fines, aucun élément natif Windows.
+   ============================================================ */
+
+:root {
+  /* Fonds */
+  --bg-app: #0d0d0d;
+  --bg-canvas-area: #0d0d0d;
+  --bg-panel: #1a1a1a;
+  --bg-panel-2: #151515;
+  --bg-titlebar: #161616;
+  --bg-rail: #141414;
+
+  /* Surfaces interactives */
+  --surface-hover: #222222;
+  --surface-active: #2a2a2a;
+  --surface-input: #111111;
+
+  /* Bordures */
+  --border: #2a2a2a;
+  --border-soft: #232323;
+  --border-strong: #333333;
+
+  /* Texte / icônes */
+  --text: #aaaaaa;
+  --text-dim: #6b6b6b;
+  --text-bright: #e8e8e8;
+  --icon: #8a8a8a;
+  --icon-hover: #d0d0d0;
+  --icon-active: #f2f2f2;
+
+  /* Accent (très sobre, monochrome clair) */
+  --accent: #e8e8e8;
+  --danger: #e5484d;
+
+  /* Métriques */
+  --titlebar-h: 38px;
+  --rail-w: 56px;
+  --panel-w: 272px;
+  --statusbar-h: 26px;
+  --radius: 8px;
+  --radius-sm: 6px;
+
+  --font: 'Inter', 'Segoe UI Variable', 'Segoe UI', system-ui, -apple-system,
+    sans-serif;
+
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg-app);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  user-select: none;
+  cursor: default;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: inherit;
+}
+
+/* --- Scrollbars custom (jamais celles de l'OS) --- */
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #2c2c2c;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a3a;
+  background-clip: padding-box;
+}
+
+/* ============================================================
+   Layout principal
+   ============================================================ */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--bg-app);
+}
+
+.workspace {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+/* ============================================================
+   TitleBar
+   ============================================================ */
+.titlebar {
+  height: var(--titlebar-h);
+  flex: 0 0 var(--titlebar-h);
+  display: flex;
+  align-items: center;
+  background: var(--bg-titlebar);
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag;
+  padding-left: 12px;
+  position: relative;
+  z-index: 50;
+}
+
+.titlebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-right: 4px;
+  flex: 0 0 auto;
+}
+
+.titlebar__logo {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.titlebar__title {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--text-bright);
+}
+
+.titlebar__sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+.titlebar__doc {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+.titlebar__controls {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+
+.win-btn {
+  width: 46px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--icon);
+  transition: background 0.12s var(--ease), color 0.12s var(--ease);
+}
+.win-btn:hover {
+  background: var(--surface-hover);
+  color: var(--icon-hover);
+}
+.win-btn--close:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* --- Onglets (type navigateur) --- */
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 100%;
+  padding: 0 6px;
+  overflow: hidden;
+  flex: 0 1 auto;
+  min-width: 0;
+  -webkit-app-region: no-drag;
+}
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  max-width: 168px;
+  min-width: 92px;
+  padding: 0 6px 0 12px;
+  border-radius: 7px;
+  color: var(--text-dim);
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.12s var(--ease), color 0.12s var(--ease),
+    border-color 0.12s var(--ease);
+}
+.tab:hover {
+  background: #1f1f1f;
+  color: var(--text);
+}
+.tab.is-active {
+  background: var(--bg-panel);
+  color: var(--text-bright);
+  border-color: var(--border);
+}
+.tab__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tab__close {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 4px;
+  color: var(--text-dim);
+  opacity: 0;
+  transition: opacity 0.12s var(--ease), background 0.12s var(--ease),
+    color 0.12s var(--ease);
+}
+.tab:hover .tab__close,
+.tab.is-active .tab__close {
+  opacity: 1;
+}
+.tab__close:hover {
+  background: var(--surface-active);
+  color: var(--icon-hover);
+}
+.tab__new {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--icon);
+  transition: background 0.12s var(--ease), color 0.12s var(--ease);
+}
+.tab__new:hover {
+  background: var(--surface-hover);
+  color: var(--icon-hover);
+}
+.titlebar__spacer {
+  flex: 1;
+  min-width: 24px;
+  height: 100%;
+  -webkit-app-region: drag;
+}
+
+/* --- Barre de zoom flottante --- */
+.zoombar {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45);
+  z-index: 10;
+}
+.zoombar__btn {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--icon);
+  transition: background 0.12s var(--ease), color 0.12s var(--ease);
+}
+.zoombar__btn:hover {
+  background: var(--surface-hover);
+  color: var(--icon-hover);
+}
+.zoombar__label {
+  min-width: 54px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  font-size: 11.5px;
+  color: var(--text);
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  transition: background 0.12s var(--ease), color 0.12s var(--ease);
+}
+.zoombar__label:hover {
+  background: var(--surface-hover);
+  color: var(--text-bright);
+}
+
+/* ============================================================
+   Rail d'outils (gauche)
+   ============================================================ */
+.rail {
+  width: var(--rail-w);
+  flex: 0 0 var(--rail-w);
+  background: var(--bg-rail);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+  gap: 4px;
+}
+
+.rail__group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.rail__spacer {
+  flex: 1;
+}
+
+.rail__divider {
+  width: 24px;
+  height: 1px;
+  background: var(--border);
+  margin: 6px 0;
+}
+
+.tool-btn {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  color: var(--icon);
+  transition: background 0.14s var(--ease), color 0.14s var(--ease),
+    box-shadow 0.14s var(--ease);
+}
+.tool-btn:hover {
+  background: var(--surface-hover);
+  color: var(--icon-hover);
+}
+.tool-btn.is-active {
+  background: var(--surface-active);
+  color: var(--icon-active);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.tool-btn.is-active::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+/* ============================================================
+   Tooltips custom (jamais le title natif)
+   ============================================================ */
+.tip {
+  position: relative;
+}
+.tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+  background: #000;
+  color: var(--text-bright);
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 5px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s var(--ease), transform 0.14s var(--ease);
+  z-index: 100;
+}
+.tip:hover::after {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+  transition-delay: 0.35s;
+}
+.tip[data-tip-pos='bottom']::after {
+  left: 50%;
+  top: calc(100% + 10px);
+  transform: translateX(-50%) translateY(-4px);
+}
+.tip[data-tip-pos='bottom']:hover::after {
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ============================================================
+   Canvas (zone centrale)
+   ============================================================ */
+/* Hôte des onglets : chaque .canvas-area est empilée, seule l'active est visible. */
+.stage-host {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.canvas-area {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-canvas-area);
+  /* léger grain de points en fond, comme la réf */
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgba(255, 255, 255, 0.025) 1px,
+    transparent 0
+  );
+  background-size: 22px 22px;
+  overflow: hidden;
+}
+.canvas-area.is-hidden {
+  display: none;
+}
+
+/* Viewport transformé (zoom + pan) contenant les canvases. */
+.canvas-viewport {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+/* Le papier de dessin : feuille claire encadrée par le fond sombre pointillé,
+   avec une ombre douce — l'app reste dark, la surface de dessin est claire. */
+.canvas-stage {
+  position: absolute;
+  inset: 18px;
+  background: #ffffff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+  transition: background 0.2s var(--ease);
+}
+/* Mode sombre du calque : papier teinté comme les menus de l'app (pas noir). */
+.canvas-stage.is-dark {
+  background: #1e1e1e;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+/* Couches en espace-monde : position (left/top) et taille (width/height) sont
+   posées en pixels par useCanvas — le document s'étend bien au-delà du viewport
+   (toile infinie). */
+.canvas-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  touch-action: none;
+}
+.canvas-overlay {
+  cursor: none; /* on affiche l'anneau custom à la place */
+}
+
+/* Pan en cours (clic-molette) : main fermée + on masque l'anneau de pinceau. */
+.canvas-stage.is-panning,
+.canvas-stage.is-panning .canvas-overlay {
+  cursor: grabbing;
+}
+.canvas-stage.is-panning .brush-cursor {
+  opacity: 0 !important;
+}
+
+.brush-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.55);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.65);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s var(--ease);
+  will-change: transform;
+  z-index: 5;
+}
+
+/* ============================================================
+   Panneau de droite
+   ============================================================ */
+.panel {
+  width: var(--panel-w);
+  flex: 0 0 var(--panel-w);
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.section {
+  padding: 16px 16px 18px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.section:last-child {
+  border-bottom: none;
+}
+
+.section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.section__title {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.section__value {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Champ générique (ligne label + contrôle) --- */
+.field {
+  margin-bottom: 16px;
+}
+.field:last-child {
+  margin-bottom: 0;
+}
+.field__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 9px;
+}
+.field__name {
+  font-size: 12px;
+  color: var(--text);
+}
+.field__val {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   Slider custom
+   ============================================================ */
+.slider {
+  position: relative;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+}
+.slider__track {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  border-radius: 4px;
+  background: #2b2b2b;
+}
+.slider__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #6a6a6a, #d8d8d8);
+}
+.slider__thumb {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f0f0f0;
+  border: 1px solid #000;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  transition: transform 0.08s var(--ease);
+}
+.slider:hover .slider__thumb {
+  transform: translate(-50%, -50%) scale(1.12);
+}
+.slider:active .slider__thumb {
+  transform: translate(-50%, -50%) scale(1.05);
+}
+
+/* ============================================================
+   Aperçu du pinceau
+   ============================================================ */
+.brush-preview {
+  height: 60px;
+  border-radius: var(--radius-sm);
+  background: repeating-conic-gradient(#fff 0% 25%, #efefef 0% 50%) 50% / 14px
+    14px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.brush-preview__dot {
+  border-radius: 50%;
+  background: #000;
+}
+
+/* ============================================================
+   Color picker
+   ============================================================ */
+.cp__current {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 15px;
+}
+.cp__swatch-lg {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  flex: 0 0 auto;
+}
+.cp__hex {
+  flex: 1;
+  min-width: 0;
+}
+.cp__hex-label {
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+.cp__hex-input {
+  width: 100%;
+  background: var(--surface-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-bright);
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 12px;
+  padding: 6px 9px;
+  outline: none;
+  text-transform: uppercase;
+  transition: border-color 0.14s var(--ease);
+}
+.cp__hex-input:focus {
+  border-color: var(--border-strong);
+}
+
+/* Zone Saturation / Valeur */
+.cp__sv {
+  position: relative;
+  width: 100%;
+  height: 132px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 13px;
+  cursor: crosshair;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  touch-action: none;
+}
+.cp__sv-white {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #fff, rgba(255, 255, 255, 0));
+}
+.cp__sv-black {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, #000, rgba(0, 0, 0, 0));
+}
+.cp__sv-thumb {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.6);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* Bandeau de teinte (hue) */
+.cp__hue {
+  position: relative;
+  width: 100%;
+  height: 13px;
+  border-radius: 7px;
+  margin-bottom: 16px;
+  cursor: pointer;
+  background: linear-gradient(
+    90deg,
+    #ff0000 0%,
+    #ffff00 17%,
+    #00ff00 33%,
+    #00ffff 50%,
+    #0000ff 67%,
+    #ff00ff 83%,
+    #ff0000 100%
+  );
+  touch-action: none;
+}
+.cp__hue-thumb {
+  position: absolute;
+  top: 50%;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+/* Palette de presets */
+.cp__sub {
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin: 4px 0 9px;
+}
+.cp__grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.cp__chip {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  transition: transform 0.1s var(--ease);
+}
+.cp__chip:hover {
+  transform: scale(1.12);
+  z-index: 2;
+}
+.cp__chip.is-active {
+  box-shadow: 0 0 0 2px var(--bg-panel), 0 0 0 3px var(--accent);
+}
+
+/* Couleurs récentes */
+.cp__recent {
+  display: flex;
+  gap: 7px;
+}
+.cp__recent-chip {
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: transform 0.1s var(--ease);
+}
+.cp__recent-chip:hover {
+  transform: scale(1.1);
+}
+.cp__recent-empty {
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  border: 1px dashed var(--border-strong);
+}
+
+/* ============================================================
+   Status bar
+   ============================================================ */
+.statusbar {
+  height: var(--statusbar-h);
+  flex: 0 0 var(--statusbar-h);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 14px;
+  background: var(--bg-titlebar);
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.statusbar__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.statusbar__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.statusbar__spacer {
+  flex: 1;
+}
+.statusbar__brand {
+  color: var(--text-dim);
+  letter-spacing: 0.4px;
+}

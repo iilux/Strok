@@ -1,0 +1,12 @@
+node_modules/
+dist/
+release/
+*.log
+.DS_Store
+.vite/
+
+# Outils locaux Claude Code — non publiés
+.claude/
+
+# Spec interne — non publiée
+AGENT.md

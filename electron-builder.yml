@@ -1,0 +1,36 @@
+appId: com.strok.app
+productName: Strok
+copyright: Copyright © 2026 Strok
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**/*
+  - electron/**/*
+  - package.json
+
+# Compression et autonomie : l'exe embarque Node + Chromium, aucune
+# installation de Node n'est requise sur la machine cible.
+asar: true
+compression: maximum
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+  artifactName: ${productName}-Setup-${version}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Strok
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
