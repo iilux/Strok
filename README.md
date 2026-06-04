@@ -43,6 +43,9 @@ npm run icon     # régénère build/icon.ico
   clic sur le `%` pour réinitialiser ; pan au **clic-molette** (glisser).
 - **Titlebar custom** (minimiser / maximiser / fermer) + **anneau de curseur**
   indiquant la taille du pinceau (suit le zoom).
+- **Aide-mémoire des raccourcis** : un bouton **?** dans la titlebar (juste à
+  côté de « minimiser ») ouvre un **popup intégré** listant tous les raccourcis.
+  Voir [Aide-mémoire des raccourcis](#aide-mémoire-des-raccourcis).
 - **Annuler / Rétablir** (`Ctrl + Z` / `Ctrl + Y`), historique par onglet
   compatible toile infinie (géométrie + bitmap restaurés).
 - **Fichiers** : projet `.strok` ré-éditable (enregistrer / ouvrir) + export PNG.
@@ -65,6 +68,25 @@ npm run icon     # régénère build/icon.ico
 | `Ctrl + 0` | Réinitialiser le zoom |
 | `molette` | Zoomer / dézoomer (vers le curseur) |
 | `Ctrl + molette` | Taille du pinceau / gomme |
+| `clic-molette` (glisser) | Déplacer la toile (pan) |
+
+> 💡 Cette même liste est consultable **dans l'app** via le bouton **?** de la
+> titlebar — cf. [Aide-mémoire des raccourcis](#aide-mémoire-des-raccourcis).
+
+### Aide-mémoire des raccourcis
+
+Un bouton **?** est placé dans la titlebar, **juste à gauche du bouton
+« minimiser »** (le trait `—`). Au clic, il ouvre un **popup intégré** récapitulant
+tous les raccourcis, regroupés par thème (Outils, Édition, Fichiers, Onglets, Vue).
+
+Comment il réagit :
+
+- Ce **n'est pas une vraie fenêtre OS** : c'est un overlay rendu **dans l'app**
+  (même mécanique que la modale [Extensions (addons)](#extensions-addons)).
+- L'**app derrière est floutée** (effet `backdrop-filter`) tant que le popup est
+  ouvert.
+- On le **ferme** de trois façons : la **petite croix** en haut à droite du popup,
+  un **clic sur l'app floutée** (en dehors de la carte), ou la touche **`Échap`**.
 
 ### Architecture du dessin
 
@@ -228,7 +250,7 @@ Stroke/
 ├── src/
 │   ├── App.jsx         # état global + assemblage + intégration addons/toasts
 │   ├── components/     # TitleBar, Sidebar, Toolbar, ColorPicker, Canvas,
-│   │                   #   AddonsModal
+│   │                   #   AddonsModal, ShortcutsModal
 │   ├── hooks/          # useCanvas (dessin + historique undo/redo)
 │   ├── addons/         # host.js (moteur addons) + useAddons.js (couche React)
 │   └── styles/global.css

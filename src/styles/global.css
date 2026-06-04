@@ -905,6 +905,11 @@ button {
   backdrop-filter: blur(2px);
   animation: modal-fade 0.14s var(--ease);
 }
+/* Flou marqué de l'app derrière (popup raccourcis). */
+.modal-overlay--blur {
+  background: rgba(8, 8, 8, 0.5);
+  backdrop-filter: blur(7px) saturate(0.9);
+}
 @keyframes modal-fade {
   from {
     opacity: 0;
@@ -1181,6 +1186,88 @@ button {
 .switch input:checked + .switch__track .switch__thumb {
   transform: translateX(15px);
   background: #111;
+}
+
+/* ============================================================
+   Popup raccourcis clavier
+   ============================================================ */
+.modal--shortcuts {
+  width: 480px;
+}
+.shortcuts {
+  padding: 6px 8px 12px;
+}
+.sc-group {
+  padding: 10px 8px 4px;
+}
+.sc-group + .sc-group {
+  border-top: 1px solid var(--border-soft);
+  margin-top: 4px;
+}
+.sc-group__title {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin: 4px 0 8px;
+}
+.sc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+}
+.sc-row:hover {
+  background: var(--bg-panel-2);
+}
+.sc-row__desc {
+  font-size: 12.5px;
+  color: var(--text);
+  min-width: 0;
+}
+.sc-row__keys {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sc-combo {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.sc-plus {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.sc-or {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.sc-hold {
+  margin-left: 3px;
+  font-size: 10.5px;
+  color: var(--text-dim);
+  font-style: italic;
+}
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 5px;
+  background: var(--surface-input);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.55);
+  color: var(--text-bright);
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 11px;
+  line-height: 1;
 }
 
 /* ============================================================
