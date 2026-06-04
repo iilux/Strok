@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, HelpCircle } from 'lucide-react';
 
 function Logo() {
   return (
@@ -29,6 +29,7 @@ export default function TitleBar({
   onSelectTab,
   onCloseTab,
   onNewTab,
+  onOpenHelp,
 }) {
   const [isMax, setIsMax] = useState(false);
 
@@ -87,6 +88,14 @@ export default function TitleBar({
       <div className="titlebar__spacer" />
 
       <div className="titlebar__controls">
+        <button
+          className="win-btn win-btn--help"
+          onClick={onOpenHelp}
+          aria-label="Raccourcis clavier"
+        >
+          <HelpCircle size={15} strokeWidth={1.7} />
+        </button>
+
         <button
           className="win-btn"
           onClick={() => api?.minimize()}
