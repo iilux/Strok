@@ -5,6 +5,7 @@ import Toolbar from './components/Toolbar.jsx';
 import ColorPicker from './components/ColorPicker.jsx';
 import Canvas from './components/Canvas.jsx';
 import AddonsModal from './components/AddonsModal.jsx';
+import ShortcutsModal from './components/ShortcutsModal.jsx';
 import useAddons from './addons/useAddons.js';
 
 const INK_LIGHT = '#111111'; // crayon par défaut sur papier clair
@@ -121,6 +122,7 @@ export default function App() {
 
   // --- Extensions (addons) + notifications toast ---
   const [addonsOpen, setAddonsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
 
   const pushToast = useCallback((message, type = 'info') => {
@@ -409,6 +411,7 @@ export default function App() {
         onSelectTab={setActiveTabId}
         onCloseTab={closeTab}
         onNewTab={newTab}
+        onOpenHelp={() => setHelpOpen(true)}
       />
 
       <div className="workspace">
@@ -512,6 +515,8 @@ export default function App() {
           onClose={() => setAddonsOpen(false)}
         />
       )}
+
+      {helpOpen && <ShortcutsModal onClose={() => setHelpOpen(false)} />}
 
       <Toasts toasts={toasts} />
     </div>
