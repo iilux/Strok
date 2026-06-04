@@ -29,6 +29,13 @@ const DEV_URL = 'http://127.0.0.1:5173';
 // Limites de sécurité sur les payloads IPC (anti-DoS mémoire / fichiers géants).
 const MAX_PROJECT_BYTES = 256 * 1024 * 1024; // 256 Mo de JSON .strok
 const MAX_IMAGE_BYTES = 256 * 1024 * 1024; // 256 Mo de PNG décodé
+const MAX_ADDON_BYTES = 2 * 1024 * 1024; // 2 Mo de code par addon
+
+// Extensions reconnues pour un fichier d'addon (script ES/CommonJS « .strokaddon »).
+const ADDON_EXT_RE = /\.(strokaddon|mjs|js)$/i;
+// Les addons importés sont copiés ici (persistants entre les sessions). On les
+// range dans userData et JAMAIS dans le bundle de l'app (asar = lecture seule).
+const addonsDir = () => path.join(app.getPath('userData'), 'strok-addons');
 
 let mainWindow = null;
 
@@ -275,6 +282,113 @@ ipcMain.handle('image:export', async (e, payload) => {
   try {
     await fs.writeFile(filePath, buffer);
     return { ok: true, path: filePath };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message) };
+  }
+});
+
+// ───────────────────────── IPC : addons (extensions) ─────────────────────────
+// Les addons sont du code tiers que l'utilisateur télécharge puis importe. On les
+// stocke sous forme de fichiers dans userData/strok-addons. Le renderer les charge
+// et les exécute LUI-MÊME (sandbox sans Node) ; le main ne fait QUE de la
+// persistance fichier — il n'exécute jamais ce code.
+
+async function ensureAddonsDir() {
+  const dir = addonsDir();
+  await fs.mkdir(dir, { recursive: true });
+  return dir;
+}
+
+// Résout un nom de fichier d'addon en chemin sûr DANS le dossier addons.
+// Refuse toute traversée de répertoire (..\, chemins absolus, sous-dossiers).
+function resolveAddonPath(dir, file) {
+  const base = path.basename(String(file || ''));
+  if (!base || !ADDON_EXT_RE.test(base)) return null;
+  const full = path.join(dir, base);
+  if (path.dirname(full) !== dir) return null; // anti path-traversal
+  return full;
+}
+
+ipcMain.handle('addons:list', async () => {
+  try {
+    const dir = await ensureAddonsDir();
+    const names = await fs.readdir(dir);
+    const addons = [];
+    for (const name of names) {
+      if (!ADDON_EXT_RE.test(name)) continue;
+      try {
+        const full = path.join(dir, name);
+        const stat = await fs.stat(full);
+        if (!stat.isFile() || stat.size > MAX_ADDON_BYTES) continue;
+        const code = await fs.readFile(full, 'utf8');
+        addons.push({ file: name, code });
+      } catch {
+        /* fichier illisible : on l'ignore */
+      }
+    }
+    return { ok: true, addons };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message) };
+  }
+});
+
+ipcMain.handle('addons:import', async (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  const dir = await ensureAddonsDir();
+  const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    title: 'Importer un addon',
+    properties: ['openFile'],
+    filters: [{ name: 'Addon Strok', extensions: ['strokaddon', 'js', 'mjs'] }],
+  });
+  if (canceled || !filePaths || !filePaths[0]) return { ok: false, canceled: true };
+
+  try {
+    const src = filePaths[0];
+    const stat = await fs.stat(src);
+    if (stat.size > MAX_ADDON_BYTES) return { ok: false, error: 'too-large' };
+    const code = await fs.readFile(src, 'utf8');
+
+    // Nom de destination assaini + unique (suffixe « (n) » en cas de collision).
+    let base = path.basename(src).replace(/[\\/:*?"<>|]+/g, '_');
+    if (!ADDON_EXT_RE.test(base)) base += '.strokaddon';
+    let dest = path.join(dir, base);
+    let n = 1;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      try {
+        await fs.access(dest);
+      } catch {
+        break; // n'existe pas encore -> nom libre
+      }
+      const ext = path.extname(base);
+      const stem = base.slice(0, base.length - ext.length);
+      dest = path.join(dir, `${stem} (${n})${ext}`);
+      n += 1;
+    }
+    await fs.writeFile(dest, code, 'utf8');
+    return { ok: true, file: path.basename(dest), code };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message) };
+  }
+});
+
+ipcMain.handle('addons:remove', async (_e, payload) => {
+  try {
+    const dir = await ensureAddonsDir();
+    const full = resolveAddonPath(dir, payload?.file);
+    if (!full) return { ok: false, error: 'bad-file' };
+    await fs.rm(full, { force: true });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message) };
+  }
+});
+
+ipcMain.handle('addons:openFolder', async () => {
+  try {
+    const dir = await ensureAddonsDir();
+    await shell.openPath(dir);
+    return { ok: true };
   } catch (err) {
     return { ok: false, error: String(err && err.message) };
   }

@@ -1,0 +1,65 @@
+/* Strok addon — Trait arc-en-ciel
+ * Quand il est actif, la teinte du crayon avance après CHAQUE trait. Montre :
+ *   - un état persistant (strok.storage),
+ *   - l'abonnement à un événement (strok.on('strokeEnd', ...)),
+ *   - le nettoyage via la fonction deactivate() renvoyée par activate(). */
+
+module.manifest = {
+  id: 'strok.example.rainbow',
+  name: 'Trait arc-en-ciel',
+  version: '1.0.0',
+  author: 'Strok',
+  description:
+    "Fait défiler la couleur du crayon après chaque trait. Cliquez la commande pour activer/désactiver.",
+};
+
+module.activate = function (strok) {
+  let hue = strok.storage.get('hue', 0);
+  let off = null; // désabonnement de l'écouteur strokeEnd
+
+  const setActive = (on) => {
+    strok.storage.set('active', on);
+    if (on && !off) {
+      off = strok.on('strokeEnd', () => {
+        hue = (hue + 32) % 360;
+        strok.storage.set('hue', hue);
+        strok.setColor(hslToHex(hue, 85, 55));
+      });
+      strok.notify('Arc-en-ciel activé');
+    } else if (!on && off) {
+      off();
+      off = null;
+      strok.notify('Arc-en-ciel désactivé');
+    }
+  };
+
+  strok.addCommand({
+    id: 'toggle',
+    label: 'Arc-en-ciel : activer / désactiver',
+    run: () => setActive(!strok.storage.get('active', false)),
+  });
+
+  // Restaure l'état au chargement.
+  if (strok.storage.get('active', false)) setActive(true);
+
+  // Nettoyage si l'addon est désactivé / supprimé.
+  return {
+    deactivate: () => {
+      if (off) off();
+    },
+  };
+};
+
+function hslToHex(h, s, l) {
+  s /= 100;
+  l /= 100;
+  const k = (n) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => {
+    const c = l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    return Math.round(255 * c)
+      .toString(16)
+      .padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}

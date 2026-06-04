@@ -498,6 +498,31 @@ export default function useCanvas({
     [ensureInit]
   );
 
+  /* ---- Accès pour les addons ---- */
+  // Contexte 2D du calque `main` (transform dpr déjà posée -> coords px CSS).
+  const getMainContext = useCallback(() => {
+    ensureInit();
+    return mainRef.current?.getContext('2d') ?? null;
+  }, [ensureInit]);
+
+  // Géométrie utile à un addon : dimensions physiques + rectangle doc en px CSS.
+  const getCanvasInfo = useCallback(() => {
+    const main = mainRef.current;
+    if (!main) return null;
+    const r = docRect.current;
+    return {
+      width: main.width,
+      height: main.height,
+      dpr: r.dpr || window.devicePixelRatio || 1,
+      doc: { x: r.x, y: r.y, w: r.w, h: r.h },
+    };
+  }, []);
+
+  // Valide une édition faite par un addon directement sur le contexte (undo/redo).
+  const commit = useCallback(() => {
+    pushHistory();
+  }, []);
+
   /* ---- Undo / Redo ---- */
   const undo = useCallback(() => {
     const h = history.current;
@@ -531,5 +556,8 @@ export default function useCanvas({
     getProject,
     loadProject,
     exportImage,
+    getMainContext,
+    getCanvasInfo,
+    commit,
   };
 }

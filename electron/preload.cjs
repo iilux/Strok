@@ -19,4 +19,10 @@ contextBridge.exposeInMainWorld('strok', {
   openProject: () => ipcRenderer.invoke('project:open'),
   exportImage: (dataURL, suggestedName) =>
     ipcRenderer.invoke('image:export', { dataURL, suggestedName }),
+
+  // Addons : persistance fichier dans userData (le renderer exécute le code).
+  listAddons: () => ipcRenderer.invoke('addons:list'),
+  importAddon: () => ipcRenderer.invoke('addons:import'),
+  removeAddon: (file) => ipcRenderer.invoke('addons:remove', { file }),
+  openAddonsFolder: () => ipcRenderer.invoke('addons:openFolder'),
 });
