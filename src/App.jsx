@@ -4,10 +4,13 @@ import Sidebar from './components/Sidebar.jsx';
 import Toolbar from './components/Toolbar.jsx';
 import ColorPicker from './components/ColorPicker.jsx';
 import Canvas from './components/Canvas.jsx';
+import AddonsModal from './components/AddonsModal.jsx';
+import useAddons from './addons/useAddons.js';
 
 const INK_LIGHT = '#111111'; // crayon par défaut sur papier clair
 const INK_DARK = '#d4d4d4'; // crayon coordonné sur papier sombre
 
+const APP_VERSION = '1.0.0';
 const PROJECT_VERSION = 1;
 
 // API Electron (dialogues fichier). Absente sous `vite preview` => fallback navigateur.
@@ -53,6 +56,20 @@ function pickFileText(accept) {
     };
     input.click();
   });
+}
+
+let toastSeq = 0;
+
+function Toasts({ toasts }) {
+  return (
+    <div className="toasts">
+      {toasts.map((t) => (
+        <div key={t.id} className={`toast toast--${t.type || 'info'}`}>
+          {t.message}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 let tabSeq = 0;
@@ -101,6 +118,51 @@ export default function App() {
 
   // Handles impératifs des <Canvas> montés, indexés par id d'onglet.
   const canvasRefs = useRef(new Map());
+
+  // --- Extensions (addons) + notifications toast ---
+  const [addonsOpen, setAddonsOpen] = useState(false);
+  const [toasts, setToasts] = useState([]);
+
+  const pushToast = useCallback((message, type = 'info') => {
+    const id = (toastSeq += 1);
+    setToasts((list) => [...list, { id, message, type }]);
+    setTimeout(() => setToasts((list) => list.filter((t) => t.id !== id)), 3400);
+  }, []);
+
+  // Pont vers l'état de l'app, donné aux addons. Les méthodes délèguent à des
+  // refs « live » pour rester stables (l'hôte d'addons ne doit jamais être recréé)
+  // tout en lisant/écrivant toujours l'état courant.
+  const liveRef = useRef({});
+  const actionsRef = useRef({});
+  const bridgeRef = useRef(null);
+  if (!bridgeRef.current) {
+    bridgeRef.current = {
+      appVersion: APP_VERSION,
+      getColor: () => liveRef.current.color,
+      getTool: () => liveRef.current.tool,
+      getSize: () => liveRef.current.size,
+      getOpacity: () => liveRef.current.opacity,
+      setColor: (hex) => actionsRef.current.setColor?.(hex),
+      setTool: (id) => actionsRef.current.setTool?.(id),
+      setSize: (n) => actionsRef.current.setSize?.(n),
+      setOpacity: (n) => actionsRef.current.setOpacity?.(n),
+      getActiveCanvas: () => actionsRef.current.getActiveCanvas?.(),
+      pushToast: (msg, type) => actionsRef.current.pushToast?.(msg, type),
+    };
+  }
+
+  const {
+    addons: addonList,
+    commands: addonCommands,
+    busy: addonsBusy,
+    isElectron: addonsElectron,
+    importAddon,
+    removeAddon,
+    toggleAddon,
+    runCommand,
+    openFolder,
+    emit: emitAddon,
+  } = useAddons(bridgeRef.current);
 
   // Gomme temporaire : tant que Maj est maintenue on force la gomme, et on
   // restaure l'outil précédent au relâchement (`shiftErasing` évite de
@@ -232,6 +294,25 @@ export default function App() {
     else downloadDataURL(suggested, dataURL);
   }, [activeTabId, activeTab, darkCanvas]);
 
+  // Maintient les refs « live » du pont addon à jour à chaque rendu.
+  liveRef.current = { color, tool, size, opacity, activeTabId };
+  actionsRef.current = {
+    setColor: handleColorCommit,
+    setTool,
+    setSize,
+    setOpacity,
+    getActiveCanvas: () => canvasRefs.current.get(activeTabId),
+    pushToast,
+  };
+
+  // Diffuse les changements d'état pertinents aux addons abonnés.
+  useEffect(() => {
+    emitAddon('colorChange', color);
+  }, [color, emitAddon]);
+  useEffect(() => {
+    emitAddon('toolChange', tool);
+  }, [tool, emitAddon]);
+
   // --- Raccourcis clavier ---
   useEffect(() => {
     const onKey = (e) => {
@@ -340,6 +421,7 @@ export default function App() {
           onSaveProject={handleSaveProject}
           onOpenProject={handleOpenProject}
           onExportImage={handleExportImage}
+          onOpenAddons={() => setAddonsOpen(true)}
         />
 
         <div className="stage-host">
@@ -361,6 +443,7 @@ export default function App() {
               panY={tab.panY}
               onViewChange={(v) => setTabView(tab.id, v)}
               onSizeChange={setSize}
+              onStroke={() => emitAddon('strokeEnd')}
               clearSignal={clearSignal}
             />
           ))}
@@ -381,6 +464,28 @@ export default function App() {
             onColorChange={setColor}
             onColorCommit={handleColorCommit}
           />
+
+          {addonCommands.length > 0 && (
+            <div className="section">
+              <div className="section__head">
+                <span className="section__title">Extensions</span>
+                <span className="section__value">{addonCommands.length}</span>
+              </div>
+              <div className="ext-list">
+                {addonCommands.map((c) => (
+                  <button
+                    key={c.key}
+                    className="ext-btn"
+                    onClick={() => runCommand(c.key)}
+                    title={`${c.label} — ${c.addon}`}
+                  >
+                    <span className="ext-btn__label">{c.label}</span>
+                    <span className="ext-btn__addon">{c.addon}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </aside>
       </div>
 
@@ -392,6 +497,23 @@ export default function App() {
         opacity={opacity}
         color={color}
       />
+
+      {addonsOpen && (
+        <AddonsModal
+          addons={addonList}
+          commands={addonCommands}
+          busy={addonsBusy}
+          isElectron={addonsElectron}
+          onImport={importAddon}
+          onRemove={removeAddon}
+          onToggle={toggleAddon}
+          onRun={runCommand}
+          onOpenFolder={openFolder}
+          onClose={() => setAddonsOpen(false)}
+        />
+      )}
+
+      <Toasts toasts={toasts} />
     </div>
   );
 }

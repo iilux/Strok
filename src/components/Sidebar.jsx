@@ -7,6 +7,7 @@ import {
   Save,
   FolderOpen,
   Download,
+  Puzzle,
 } from 'lucide-react';
 
 const TOOLS = [
@@ -23,6 +24,7 @@ export default function Sidebar({
   onSaveProject,
   onOpenProject,
   onExportImage,
+  onOpenAddons,
 }) {
   return (
     <nav className="rail">
@@ -61,6 +63,16 @@ export default function Sidebar({
           onClick={onExportImage}
         >
           <Download size={18} strokeWidth={1.6} />
+        </button>
+      </div>
+
+      <div className="rail__group">
+        <button
+          className="tool-btn tip"
+          data-tip="Extensions"
+          onClick={onOpenAddons}
+        >
+          <Puzzle size={18} strokeWidth={1.6} />
         </button>
       </div>
 

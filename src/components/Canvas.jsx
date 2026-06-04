@@ -24,6 +24,7 @@ function Canvas(
     panY,
     onViewChange,
     onSizeChange,
+    onStroke,
     clearSignal,
   },
   ref
@@ -39,6 +40,9 @@ function Canvas(
     getProject,
     loadProject,
     exportImage,
+    getMainContext,
+    getCanvasInfo,
+    commit,
   } = useCanvas({
     tool,
     color,
@@ -47,15 +51,36 @@ function Canvas(
     zoom,
     panX,
     panY,
+    onStroke,
   });
 
   const cursorRef = useRef(null);
 
-  // Méthodes impératives exposées à App (sauvegarde / ouverture / export).
+  // Méthodes impératives exposées à App (fichiers, historique, accès addons).
   useImperativeHandle(
     ref,
-    () => ({ getProject, loadProject, exportImage, clear, undo, redo }),
-    [getProject, loadProject, exportImage, clear, undo, redo]
+    () => ({
+      getProject,
+      loadProject,
+      exportImage,
+      clear,
+      undo,
+      redo,
+      getMainContext,
+      getCanvasInfo,
+      commit,
+    }),
+    [
+      getProject,
+      loadProject,
+      exportImage,
+      clear,
+      undo,
+      redo,
+      getMainContext,
+      getCanvasInfo,
+      commit,
+    ]
   );
 
   // Refs « live » pour le handler de molette (lié une seule fois).

@@ -1,0 +1,42 @@
+/* Strok addon — Inverser les couleurs (négatif)
+ * Montre l'accès pixel via getImageData / putImageData. Les coordonnées de
+ * pixels utilisent les dimensions PHYSIQUES (info.width / info.height), pas les
+ * px CSS, car putImageData ignore la transform. */
+
+module.manifest = {
+  id: 'strok.example.invert',
+  name: 'Inverser les couleurs',
+  version: '1.0.0',
+  author: 'Strok',
+  description: 'Inverse (négatif) les pixels déjà dessinés sur le calque actif.',
+};
+
+module.activate = function (strok) {
+  strok.addCommand({
+    id: 'invert',
+    label: 'Inverser (négatif)',
+    run: () => {
+      const ctx = strok.getContext();
+      const info = strok.getCanvasInfo();
+      if (!ctx || !info) {
+        strok.notify('Aucun calque actif', 'error');
+        return;
+      }
+      const { width, height } = info; // pixels physiques
+      const image = ctx.getImageData(0, 0, width, height);
+      const d = image.data;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] === 0) continue; // ignore les pixels transparents (papier)
+        d[i] = 255 - d[i];
+        d[i + 1] = 255 - d[i + 1];
+        d[i + 2] = 255 - d[i + 2];
+      }
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0); // putImageData travaille en px physiques
+      ctx.putImageData(image, 0, 0);
+      ctx.restore();
+      strok.commit();
+      strok.notify('Couleurs inversées');
+    },
+  });
+};
