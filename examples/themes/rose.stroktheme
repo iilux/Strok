@@ -1,0 +1,31 @@
+{
+  "manifest": {
+    "id": "com.exemple.rose",
+    "name": "Rose",
+    "version": "1.0.0",
+    "author": "Strok",
+    "description": "Sombre tiède, accent magenta."
+  },
+  "variables": {
+    "--bg-app": "#160f14",
+    "--bg-canvas-area": "#160f14",
+    "--bg-panel": "#21181d",
+    "--bg-panel-2": "#1b1318",
+    "--bg-titlebar": "#1d151a",
+    "--bg-rail": "#191116",
+    "--surface-hover": "#2e2128",
+    "--surface-active": "#392932",
+    "--surface-input": "#140d11",
+    "--border": "#33242c",
+    "--border-soft": "#281c22",
+    "--border-strong": "#45313b",
+    "--text": "#c4adb7",
+    "--text-dim": "#806672",
+    "--text-bright": "#f5e6ee",
+    "--icon": "#a88c98",
+    "--icon-hover": "#dcc4cf",
+    "--icon-active": "#f7ecf1",
+    "--accent": "#e85aa0",
+    "--danger": "#e5484d"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "_help": "MODELE DE THEME STROK. Copiez ce fichier, gardez l'extension .stroktheme, puis modifiez les couleurs ci-dessous. Un theme est du JSON pur (AUCUN code, donc aucun commentaire // possible). Importez-le via : rail de gauche -> icone Themes (palette) -> Importer un theme. Seules les cles listees dans 'variables' sont reconnues ; les valeurs sont des couleurs CSS (hex, rgb(), hsl(), mot-cle). Les valeurs ci-dessous reproduisent le theme par defaut : changez celles que vous voulez.",
+  "manifest": {
+    "id": "com.exemple.mon-theme",
+    "name": "Mon thème",
+    "version": "1.0.0",
+    "author": "Votre nom",
+    "description": "Décrivez votre thème en une phrase."
+  },
+  "variables": {
+    "--bg-app": "#0d0d0d",
+    "--bg-canvas-area": "#0d0d0d",
+    "--bg-panel": "#1a1a1a",
+    "--bg-panel-2": "#151515",
+    "--bg-titlebar": "#161616",
+    "--bg-rail": "#141414",
+    "--surface-hover": "#222222",
+    "--surface-active": "#2a2a2a",
+    "--surface-input": "#111111",
+    "--border": "#2a2a2a",
+    "--border-soft": "#232323",
+    "--border-strong": "#333333",
+    "--text": "#aaaaaa",
+    "--text-dim": "#6b6b6b",
+    "--text-bright": "#e8e8e8",
+    "--icon": "#8a8a8a",
+    "--icon-hover": "#d0d0d0",
+    "--icon-active": "#f2f2f2",
+    "--accent": "#e8e8e8",
+    "--danger": "#e5484d"
+  }
+}

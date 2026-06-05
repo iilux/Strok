@@ -1,0 +1,31 @@
+{
+  "manifest": {
+    "id": "com.exemple.forest",
+    "name": "Forêt",
+    "version": "1.0.0",
+    "author": "Strok",
+    "description": "Vert sombre, accent émeraude."
+  },
+  "variables": {
+    "--bg-app": "#0e1512",
+    "--bg-canvas-area": "#0e1512",
+    "--bg-panel": "#16201b",
+    "--bg-panel-2": "#121a16",
+    "--bg-titlebar": "#141d18",
+    "--bg-rail": "#111914",
+    "--surface-hover": "#1f2c25",
+    "--surface-active": "#27362d",
+    "--surface-input": "#0d1410",
+    "--border": "#243228",
+    "--border-soft": "#1c2820",
+    "--border-strong": "#324636",
+    "--text": "#a7bdae",
+    "--text-dim": "#647a6b",
+    "--text-bright": "#e7f3ea",
+    "--icon": "#86a08e",
+    "--icon-hover": "#c4d8c9",
+    "--icon-active": "#eef7f0",
+    "--accent": "#3fb97a",
+    "--danger": "#e5484d"
+  }
+}

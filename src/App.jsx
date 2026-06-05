@@ -5,8 +5,10 @@ import Toolbar from './components/Toolbar.jsx';
 import ColorPicker from './components/ColorPicker.jsx';
 import Canvas from './components/Canvas.jsx';
 import AddonsModal from './components/AddonsModal.jsx';
+import ThemesModal from './components/ThemesModal.jsx';
 import ShortcutsModal from './components/ShortcutsModal.jsx';
 import useAddons from './addons/useAddons.js';
+import useThemes from './themes/useThemes.js';
 
 const INK_LIGHT = '#111111'; // crayon par défaut sur papier clair
 const INK_DARK = '#d4d4d4'; // crayon coordonné sur papier sombre
@@ -120,8 +122,9 @@ export default function App() {
   // Handles impératifs des <Canvas> montés, indexés par id d'onglet.
   const canvasRefs = useRef(new Map());
 
-  // --- Extensions (addons) + notifications toast ---
+  // --- Extensions (addons) + thèmes + notifications toast ---
   const [addonsOpen, setAddonsOpen] = useState(false);
+  const [themesOpen, setThemesOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
 
@@ -165,6 +168,16 @@ export default function App() {
     openFolder,
     emit: emitAddon,
   } = useAddons(bridgeRef.current);
+
+  const {
+    themes: themeList,
+    busy: themesBusy,
+    isElectron: themesElectron,
+    applyTheme,
+    importTheme,
+    removeTheme,
+    openFolder: openThemesFolder,
+  } = useThemes(bridgeRef.current);
 
   // Gomme temporaire : tant que Maj est maintenue on force la gomme, et on
   // restaure l'outil précédent au relâchement (`shiftErasing` évite de
@@ -425,6 +438,7 @@ export default function App() {
           onOpenProject={handleOpenProject}
           onExportImage={handleExportImage}
           onOpenAddons={() => setAddonsOpen(true)}
+          onOpenThemes={() => setThemesOpen(true)}
         />
 
         <div className="stage-host">
@@ -513,6 +527,19 @@ export default function App() {
           onRun={runCommand}
           onOpenFolder={openFolder}
           onClose={() => setAddonsOpen(false)}
+        />
+      )}
+
+      {themesOpen && (
+        <ThemesModal
+          themes={themeList}
+          busy={themesBusy}
+          isElectron={themesElectron}
+          onApply={applyTheme}
+          onImport={importTheme}
+          onRemove={removeTheme}
+          onOpenFolder={openThemesFolder}
+          onClose={() => setThemesOpen(false)}
         />
       )}
 

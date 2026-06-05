@@ -25,4 +25,10 @@ contextBridge.exposeInMainWorld('strok', {
   importAddon: () => ipcRenderer.invoke('addons:import'),
   removeAddon: (file) => ipcRenderer.invoke('addons:remove', { file }),
   openAddonsFolder: () => ipcRenderer.invoke('addons:openFolder'),
+
+  // Thèmes : persistance fichier dans userData (JSON déclaratif, aucun code).
+  listThemes: () => ipcRenderer.invoke('themes:list'),
+  importTheme: () => ipcRenderer.invoke('themes:import'),
+  removeTheme: (file) => ipcRenderer.invoke('themes:remove', { file }),
+  openThemesFolder: () => ipcRenderer.invoke('themes:openFolder'),
 });
