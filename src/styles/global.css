@@ -1037,6 +1037,43 @@ button {
   border-color: #fff;
   color: #111;
 }
+.btn--danger {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--danger);
+}
+.btn--danger:hover {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* --- Modale de confirmation (fermeture d'onglet) --- */
+.modal--confirm {
+  width: 440px;
+}
+.modal__text {
+  padding: 18px 18px 6px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  min-height: 0;
+  overflow: visible;
+}
+.modal__text strong {
+  color: var(--text-bright);
+  font-weight: 600;
+}
+.modal__foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 16px;
+  flex: 0 0 auto;
+}
+.modal__foot-spacer {
+  flex: 1 1 auto;
+}
 
 /* --- Liste / lignes d'addon --- */
 .addon-empty {

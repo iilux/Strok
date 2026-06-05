@@ -31,6 +31,7 @@ const MAX_PROJECT_BYTES = 256 * 1024 * 1024; // 256 Mo de JSON .strok
 const MAX_IMAGE_BYTES = 256 * 1024 * 1024; // 256 Mo de PNG décodé
 const MAX_ADDON_BYTES = 2 * 1024 * 1024; // 2 Mo de code par addon
 const MAX_THEME_BYTES = 256 * 1024; // 256 Ko de JSON par thème
+const MAX_SESSION_BYTES = 512 * 1024 * 1024; // 512 Mo (session = plusieurs PNG base64)
 
 // Extensions reconnues pour un fichier d'addon (script ES/CommonJS « .strokaddon »).
 const ADDON_EXT_RE = /\.(strokaddon|mjs|js)$/i;
@@ -41,8 +42,22 @@ const THEME_EXT_RE = /\.stroktheme$/i;
 const addonsDir = () => path.join(app.getPath('userData'), 'strok-addons');
 // Idem pour les thèmes importés (JSON, aucun code exécuté).
 const themesDir = () => path.join(app.getPath('userData'), 'strok-themes');
+// Sauvegarde auto de l'espace de travail (onglets + dessins) entre deux lancements.
+const sessionFile = () => path.join(app.getPath('userData'), 'strok-session.json');
 
 let mainWindow = null;
+
+// Fermeture : on intercepte `close` pour laisser le renderer sérialiser la
+// session AVANT de quitter (cf. flush-on-close plus bas).
+let sessionFlushed = false;
+let flushTimer = null;
+
+// Chemins .strok que l'utilisateur a explicitement désignés via un dialogue OS
+// (enregistrer/ouvrir) durant CETTE session. Seuls ces chemins sont réinscriptibles
+// en silence par `project:saveTo` — cela préserve la garantie « toute écriture vise
+// un chemin choisi par l'utilisateur via un dialogue ». Vidé au redémarrage : la
+// première sauvegarde d'un onglet restauré repasse alors par le dialogue.
+const knownPaths = new Set();
 
 // ╔══════════════════════════════════════════════════════════════╗
 // ║                          SÉCURITÉ                              ║
@@ -144,7 +159,31 @@ function createWindow() {
     mainWindow.webContents.send('window:maximized', mainWindow.isMaximized());
   mainWindow.on('maximize', sendMax);
   mainWindow.on('unmaximize', sendMax);
+
+  // Flush-on-close : à la fermeture (croix custom OU fermeture OS), on demande au
+  // renderer de persister la session, puis on ferme réellement. Un timeout de
+  // sécurité garantit que l'app se ferme même si le renderer ne répond pas.
+  mainWindow.on('close', (e) => {
+    if (sessionFlushed) return; // 2e passage (destroy) : laisser fermer
+    e.preventDefault();
+    try {
+      mainWindow.webContents.send('session:flush-request');
+    } catch {
+      sessionFlushed = true;
+      mainWindow.destroy();
+      return;
+    }
+    flushTimer = setTimeout(() => {
+      sessionFlushed = true;
+      if (mainWindow) mainWindow.destroy();
+    }, 8000);
+  });
+
   mainWindow.on('closed', () => {
+    if (flushTimer) {
+      clearTimeout(flushTimer);
+      flushTimer = null;
+    }
     mainWindow = null;
   });
 
@@ -235,6 +274,27 @@ ipcMain.handle('project:save', async (e, payload) => {
 
   try {
     await fs.writeFile(filePath, json, 'utf8');
+    knownPaths.add(filePath); // chemin choisi par l'utilisateur → réinscriptible
+    return { ok: true, path: filePath };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message) };
+  }
+});
+
+// Écrase un .strok déjà lié, SANS redialogue (« enregistrer les dernières modifs »).
+// N'autorise que les chemins déjà désignés par l'utilisateur via un dialogue OS
+// pendant cette session — sinon refus, le renderer retombe sur « Enregistrer sous ».
+ipcMain.handle('project:saveTo', async (_e, payload) => {
+  const json = payload?.json;
+  const filePath = payload?.path;
+  if (typeof json !== 'string' || typeof filePath !== 'string')
+    return { ok: false, error: 'bad-payload' };
+  if (Buffer.byteLength(json, 'utf8') > MAX_PROJECT_BYTES)
+    return { ok: false, error: 'too-large' };
+  if (!knownPaths.has(filePath)) return { ok: false, error: 'unknown-path' };
+
+  try {
+    await fs.writeFile(filePath, json, 'utf8');
     return { ok: true, path: filePath };
   } catch (err) {
     return { ok: false, error: String(err && err.message) };
@@ -255,7 +315,8 @@ ipcMain.handle('project:open', async (e) => {
     const stat = await fs.stat(filePath);
     if (stat.size > MAX_PROJECT_BYTES) return { ok: false, error: 'too-large' };
     const json = await fs.readFile(filePath, 'utf8');
-    return { ok: true, json, name: path.basename(filePath) };
+    knownPaths.add(filePath); // l'utilisateur l'a ouvert → réinscriptible en silence
+    return { ok: true, json, name: path.basename(filePath), path: filePath };
   } catch (err) {
     return { ok: false, error: String(err && err.message) };
   }
@@ -503,4 +564,51 @@ ipcMain.handle('themes:openFolder', async () => {
   } catch (err) {
     return { ok: false, error: String(err && err.message) };
   }
+});
+
+// ───────────────────────── IPC : session (sauvegarde auto) ─────────────────────────
+// Persistance interne de l'espace de travail (onglets + dessins + vue + onglet actif)
+// entre deux lancements, dans userData/strok-session.json. Permet de tout restaurer à
+// l'identique sans que l'utilisateur ait à enregistrer chaque calque dans un .strok.
+// (Données locales, jamais transmises — cohérent avec la confidentialité de l'app.)
+
+ipcMain.handle('session:save', async (_e, payload) => {
+  const json = payload?.json;
+  if (typeof json !== 'string') return { ok: false, error: 'bad-payload' };
+  if (Buffer.byteLength(json, 'utf8') > MAX_SESSION_BYTES)
+    return { ok: false, error: 'too-large' };
+  try {
+    await fs.writeFile(sessionFile(), json, 'utf8');
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message) };
+  }
+});
+
+ipcMain.handle('session:load', async () => {
+  try {
+    const json = await fs.readFile(sessionFile(), 'utf8');
+    return { ok: true, json };
+  } catch {
+    return { ok: false }; // absente au premier lancement
+  }
+});
+
+ipcMain.handle('session:clear', async () => {
+  try {
+    await fs.rm(sessionFile(), { force: true });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message) };
+  }
+});
+
+// Le renderer signale que la session est persistée → on ferme réellement la fenêtre.
+ipcMain.on('session:flushed', () => {
+  if (flushTimer) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+  sessionFlushed = true;
+  if (mainWindow) mainWindow.destroy();
 });
