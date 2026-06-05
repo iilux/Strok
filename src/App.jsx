@@ -7,14 +7,17 @@ import Canvas from './components/Canvas.jsx';
 import AddonsModal from './components/AddonsModal.jsx';
 import ThemesModal from './components/ThemesModal.jsx';
 import ShortcutsModal from './components/ShortcutsModal.jsx';
+import ConfirmModal from './components/ConfirmModal.jsx';
 import useAddons from './addons/useAddons.js';
 import useThemes from './themes/useThemes.js';
 
 const INK_LIGHT = '#111111'; // crayon par défaut sur papier clair
 const INK_DARK = '#d4d4d4'; // crayon coordonné sur papier sombre
 
-const APP_VERSION = '1.1.2';
+const APP_VERSION = '1.2.0';
 const PROJECT_VERSION = 1;
+const SESSION_VERSION = 1;
+const AUTOSAVE_DELAY = 2000; // ms après la dernière modif avant l'autosave anti-crash
 
 // API Electron (dialogues fichier). Absente sous `vite preview` => fallback navigateur.
 const api = typeof window !== 'undefined' ? window.strok : undefined;
@@ -84,6 +87,8 @@ function makeTab() {
     zoom: 1,
     panX: 0,
     panY: 0,
+    dirty: false, // modifié depuis la dernière sauvegarde / création
+    filePath: null, // chemin du .strok lié (null = jamais enregistré sur le PC)
   };
 }
 
@@ -121,6 +126,40 @@ export default function App() {
 
   // Handles impératifs des <Canvas> montés, indexés par id d'onglet.
   const canvasRefs = useRef(new Map());
+
+  // --- Sauvegarde auto / restauration de session ---
+  // Onglet en attente de confirmation de fermeture (modale « enregistrer ? »).
+  const [pendingClose, setPendingClose] = useState(null);
+  // Compteur de modifications de contenu : déclenche l'autosave anti-rebond.
+  const [autosaveTick, setAutosaveTick] = useState(0);
+  // Miroir « live » de l'état persistable, lu par les callbacks stables (flush,
+  // autosave, save/close) sans les recréer à chaque rendu.
+  const sessionRef = useRef({ tabs, activeTabId, darkCanvas: false });
+  // Bitmaps restaurés en attente d'application (id d'onglet -> { doc, image }).
+  const pendingRestore = useRef(null);
+  const restoredRef = useRef(false);
+
+  // Marque un onglet « modifié » (contenu) et relance le minuteur d'autosave.
+  const markDirty = useCallback((id) => {
+    if (!id) return;
+    setTabs((prev) => {
+      const t = prev.find((x) => x.id === id);
+      if (!t || t.dirty) return prev; // déjà marqué -> pas de re-rendu inutile
+      return prev.map((x) => (x.id === id ? { ...x, dirty: true } : x));
+    });
+    setAutosaveTick((n) => n + 1);
+  }, []);
+
+  // Repasse un onglet « propre » après une sauvegarde réussie ; lie le fichier.
+  const markClean = useCallback((id, filePath) => {
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? { ...t, dirty: false, filePath: filePath ?? t.filePath }
+          : t
+      )
+    );
+  }, []);
 
   // --- Extensions (addons) + thèmes + notifications toast ---
   const [addonsOpen, setAddonsOpen] = useState(false);
@@ -200,7 +239,10 @@ export default function App() {
     [addRecent]
   );
 
-  const clearCanvas = useCallback(() => setClearSignal((n) => n + 1), []);
+  const clearCanvas = useCallback(() => {
+    setClearSignal((n) => n + 1);
+    markDirty(sessionRef.current.activeTabId);
+  }, [markDirty]);
 
   // Mode sombre du calque : bascule la couleur du papier ET le crayon vers une
   // teinte coordonnée (gris clair sur sombre, encre sombre sur clair).
@@ -223,19 +265,34 @@ export default function App() {
     setActiveTabId(t.id);
   }, []);
 
+  // Retire réellement un onglet (sans aucune question).
+  const removeTab = useCallback((id) => {
+    setTabs((prev) => {
+      if (prev.length <= 1) return prev; // on garde toujours au moins un onglet
+      const idx = prev.findIndex((t) => t.id === id);
+      if (idx === -1) return prev;
+      const next = prev.filter((t) => t.id !== id);
+      setActiveTabId((cur) => (cur === id ? next[Math.max(0, idx - 1)].id : cur));
+      return next;
+    });
+  }, []);
+
+  // Demande de fermeture d'onglet : si le calque a été modifié, on propose de
+  // l'enregistrer (modale) ; sinon on ferme directement. (La fermeture de l'APP,
+  // elle, ne demande rien : tout est persisté en session — cf. flush-on-close.)
   const closeTab = useCallback(
     (id) => {
-      setTabs((prev) => {
-        if (prev.length <= 1) return prev;
-        const idx = prev.findIndex((t) => t.id === id);
-        const next = prev.filter((t) => t.id !== id);
-        setActiveTabId((cur) =>
-          cur === id ? next[Math.max(0, idx - 1)].id : cur
-        );
-        return next;
-      });
+      const list = sessionRef.current.tabs;
+      if (list.length <= 1) return; // jamais le dernier onglet
+      const tab = list.find((t) => t.id === id);
+      if (!tab) return;
+      if (!tab.dirty) {
+        removeTab(id);
+        return;
+      }
+      setPendingClose(tab);
     },
-    []
+    [removeTab]
   );
 
   const setTabView = useCallback((id, partial) => {
@@ -245,35 +302,69 @@ export default function App() {
   }, []);
 
   // --- Fichiers : projet .strok (ré-éditable) + export image ---
-  const handleSaveProject = useCallback(async () => {
-    const handle = canvasRefs.current.get(activeTabId);
-    if (!handle) return;
+  // Enregistre l'onglet `id`. Si l'onglet est déjà lié à un fichier, on l'écrase
+  // en silence (project:saveTo) ; sinon on ouvre le dialogue « Enregistrer sous ».
+  // Renvoie { ok, canceled? } pour piloter la fermeture d'onglet.
+  const saveTab = useCallback(async (id) => {
+    const handle = canvasRefs.current.get(id);
+    const { tabs: list, darkCanvas: dark } = sessionRef.current;
+    const tab = list.find((t) => t.id === id);
+    if (!handle || !tab) return { ok: false };
+
     const { doc, image } = handle.getProject();
-    const project = {
+    const json = JSON.stringify({
       app: 'strok',
       version: PROJECT_VERSION,
-      name: activeTab.name,
-      darkCanvas,
-      view: { zoom: activeTab.zoom, panX: activeTab.panX, panY: activeTab.panY },
+      name: tab.name,
+      darkCanvas: dark,
+      view: { zoom: tab.zoom, panX: tab.panX, panY: tab.panY },
       doc,
       image,
-    };
-    const json = JSON.stringify(project);
-    const suggested = `${sanitize(activeTab.name)}.strok`;
-    if (api?.saveProject) await api.saveProject(json, suggested);
-    else downloadText(suggested, json, 'application/json');
-  }, [activeTabId, activeTab, darkCanvas]);
+    });
+
+    // 1) Onglet déjà lié -> écrasement direct (refusé si chemin inconnu : on
+    //    retombe alors sur le dialogue, par ex. après un redémarrage de l'app).
+    if (tab.filePath && api?.saveProjectTo) {
+      const res = await api.saveProjectTo(tab.filePath, json);
+      if (res?.ok) {
+        markClean(id, tab.filePath);
+        return { ok: true };
+      }
+      if (res?.error !== 'unknown-path') return { ok: false };
+    }
+
+    // 2) Dialogue « Enregistrer sous » (ou téléchargement en mode navigateur).
+    const suggested = `${sanitize(tab.name)}.strok`;
+    if (api?.saveProject) {
+      const res = await api.saveProject(json, suggested);
+      if (res?.ok) {
+        markClean(id, res.path || null);
+        return { ok: true };
+      }
+      return { ok: false, canceled: !!res?.canceled };
+    }
+    downloadText(suggested, json, 'application/json');
+    markClean(id, null); // pas de chemin réinscriptible hors Electron
+    return { ok: true };
+  }, [markClean]);
+
+  const handleSaveProject = useCallback(
+    () => saveTab(sessionRef.current.activeTabId),
+    [saveTab]
+  );
 
   const handleOpenProject = useCallback(async () => {
     const handle = canvasRefs.current.get(activeTabId);
     if (!handle) return;
     let json;
     let fileName;
+    let filePath = null;
     if (api?.openProject) {
       const res = await api.openProject();
       if (!res || !res.ok) return;
       json = res.json;
       fileName = res.name;
+      filePath = res.path || null; // lie l'onglet au fichier (écrasement direct ensuite)
     } else {
       const picked = await pickFileText('.strok,application/json');
       if (!picked) return;
@@ -296,6 +387,8 @@ export default function App() {
       zoom: v.zoom ?? 1,
       panX: v.panX ?? 0,
       panY: v.panY ?? 0,
+      dirty: false, // tout juste chargé -> rien à sauvegarder
+      filePath,
     });
     if (typeof project.darkCanvas === 'boolean') setDarkCanvas(project.darkCanvas);
   }, [activeTabId, setTabView]);
@@ -309,7 +402,17 @@ export default function App() {
     else downloadDataURL(suggested, dataURL);
   }, [activeTabId, activeTab, darkCanvas]);
 
-  // Maintient les refs « live » du pont addon à jour à chaque rendu.
+  // Une commande d'addon peut modifier le calque actif -> on le marque modifié.
+  const handleRunCommand = useCallback(
+    (key) => {
+      runCommand(key);
+      markDirty(sessionRef.current.activeTabId);
+    },
+    [runCommand, markDirty]
+  );
+
+  // Maintient les refs « live » à jour à chaque rendu (pont addon + session).
+  sessionRef.current = { tabs, activeTabId, darkCanvas };
   liveRef.current = { color, tool, size, opacity, activeTabId };
   actionsRef.current = {
     setColor: handleColorCommit,
@@ -327,6 +430,157 @@ export default function App() {
   useEffect(() => {
     emitAddon('toolChange', tool);
   }, [tool, emitAddon]);
+
+  // --- Sérialisation / restauration de session (sauvegarde auto) ---
+  // Sérialise tout l'espace de travail (onglets + dessins + vue + onglet actif).
+  // Tous les <Canvas> étant montés, `getProject()` lit leur backing-store même
+  // s'ils sont cachés ; un onglet jamais initialisé (doc.w == 0) est stocké sans image.
+  const serializeSession = useCallback(() => {
+    const { tabs: list, activeTabId: active, darkCanvas: dark } = sessionRef.current;
+    const outTabs = list.map((t) => {
+      let doc = null;
+      let image = null;
+      const handle = canvasRefs.current.get(t.id);
+      if (handle) {
+        try {
+          const p = handle.getProject();
+          if (p.doc && p.doc.w > 0) {
+            doc = p.doc;
+            image = p.image;
+          }
+        } catch {
+          /* onglet non sérialisable -> on garde ses métadonnées seules */
+        }
+      }
+      return {
+        id: t.id,
+        name: t.name,
+        view: { zoom: t.zoom, panX: t.panX, panY: t.panY },
+        dirty: !!t.dirty,
+        filePath: t.filePath || null,
+        doc,
+        image,
+      };
+    });
+    return JSON.stringify({
+      app: 'strok',
+      version: SESSION_VERSION,
+      activeTabId: active,
+      darkCanvas: dark,
+      tabs: outTabs,
+    });
+  }, []);
+
+  const persistSession = useCallback(async () => {
+    const json = serializeSession();
+    if (api?.saveSession) {
+      try {
+        await api.saveSession(json);
+      } catch {
+        /* non bloquant */
+      }
+    } else {
+      try {
+        localStorage.setItem('strok.session', json);
+      } catch {
+        /* quota navigateur dépassé -> ignoré (la cible réelle est Electron) */
+      }
+    }
+  }, [serializeSession]);
+
+  // Restauration au démarrage : recharge l'espace de travail de la session précédente.
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    let cancelled = false;
+    (async () => {
+      let json = null;
+      if (api?.loadSession) {
+        const res = await api.loadSession();
+        if (res?.ok) json = res.json;
+      } else {
+        try {
+          json = localStorage.getItem('strok.session');
+        } catch {
+          /* noop */
+        }
+      }
+      if (!json || cancelled) return;
+      let data;
+      try {
+        data = JSON.parse(json);
+      } catch {
+        return; // session illisible -> on démarre sur l'onglet neuf par défaut
+      }
+      if (
+        !data ||
+        data.app !== 'strok' ||
+        !Array.isArray(data.tabs) ||
+        data.tabs.length === 0
+      )
+        return;
+
+      const restored = data.tabs.map((t, i) => ({
+        id: t.id || `tab-restore-${Date.now()}-${i}`,
+        name: t.name || 'Calque',
+        zoom: t.view?.zoom ?? 1,
+        panX: t.view?.panX ?? 0,
+        panY: t.view?.panY ?? 0,
+        dirty: !!t.dirty,
+        filePath: t.filePath || null,
+      }));
+      // Les bitmaps sont appliqués après le montage des <Canvas> (effet sur [tabs]).
+      const pend = new Map();
+      data.tabs.forEach((t, i) => {
+        if (t.doc && t.doc.w > 0)
+          pend.set(restored[i].id, { doc: t.doc, image: t.image || null });
+      });
+      pendingRestore.current = pend.size ? pend : null;
+      // Évite les collisions de noms « Calque N » pour les futurs onglets.
+      tabSeq = Math.max(tabSeq, data.tabs.length);
+
+      setTabs(restored);
+      const active = restored.find((t) => t.id === data.activeTabId);
+      setActiveTabId(active ? active.id : restored[0].id);
+      if (typeof data.darkCanvas === 'boolean') setDarkCanvas(data.darkCanvas);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Applique les bitmaps restaurés dès que les <Canvas> correspondants sont montés.
+  useEffect(() => {
+    const pend = pendingRestore.current;
+    if (!pend || pend.size === 0) return;
+    for (const [id, data] of pend) {
+      const handle = canvasRefs.current.get(id);
+      if (handle) {
+        handle.loadProject(data);
+        pend.delete(id);
+      }
+    }
+    if (pend.size === 0) pendingRestore.current = null;
+  }, [tabs]);
+
+  // Persistance à la fermeture de l'app : le process principal demande un flush,
+  // on sérialise + écrit la session, puis on signale que la fenêtre peut se fermer.
+  useEffect(() => {
+    if (!api?.onSessionFlush) return;
+    return api.onSessionFlush(async () => {
+      await persistSession();
+      api.sessionFlushed();
+    });
+  }, [persistSession]);
+
+  // Autosave anti-crash : ~2 s après la dernière modification de contenu.
+  useEffect(() => {
+    if (autosaveTick === 0) return; // aucune modif à sauver pour l'instant
+    const id = setTimeout(() => {
+      persistSession();
+    }, AUTOSAVE_DELAY);
+    return () => clearTimeout(id);
+  }, [autosaveTick, persistSession]);
 
   // --- Raccourcis clavier ---
   useEffect(() => {
@@ -361,9 +615,11 @@ export default function App() {
           const handle = canvasRefs.current.get(activeTabId);
           if (e.shiftKey) handle?.redo?.();
           else handle?.undo?.();
+          markDirty(activeTabId);
         } else if (k === 'y') {
           e.preventDefault();
           canvasRefs.current.get(activeTabId)?.redo?.();
+          markDirty(activeTabId);
         }
         return;
       }
@@ -382,6 +638,7 @@ export default function App() {
     handleSaveProject,
     handleOpenProject,
     handleExportImage,
+    markDirty,
   ]);
 
   // --- Maj maintenu => gomme temporaire (restaure l'outil au relâchement) ---
@@ -460,7 +717,10 @@ export default function App() {
               panY={tab.panY}
               onViewChange={(v) => setTabView(tab.id, v)}
               onSizeChange={setSize}
-              onStroke={() => emitAddon('strokeEnd')}
+              onStroke={() => {
+                emitAddon('strokeEnd');
+                markDirty(tab.id);
+              }}
               clearSignal={clearSignal}
             />
           ))}
@@ -493,7 +753,7 @@ export default function App() {
                   <button
                     key={c.key}
                     className="ext-btn"
-                    onClick={() => runCommand(c.key)}
+                    onClick={() => handleRunCommand(c.key)}
                     title={`${c.label} — ${c.addon}`}
                   >
                     <span className="ext-btn__label">{c.label}</span>
@@ -524,7 +784,7 @@ export default function App() {
           onImport={importAddon}
           onRemove={removeAddon}
           onToggle={toggleAddon}
-          onRun={runCommand}
+          onRun={handleRunCommand}
           onOpenFolder={openFolder}
           onClose={() => setAddonsOpen(false)}
         />
@@ -544,6 +804,40 @@ export default function App() {
       )}
 
       {helpOpen && <ShortcutsModal onClose={() => setHelpOpen(false)} />}
+
+      {pendingClose && (
+        <ConfirmModal
+          title="Fermer le calque"
+          message={
+            pendingClose.filePath ? (
+              <>
+                Le calque <strong>{pendingClose.name}</strong> a été modifié.
+                Enregistrer les dernières modifications&nbsp;?
+              </>
+            ) : (
+              <>
+                Le calque <strong>{pendingClose.name}</strong> n'a jamais été
+                enregistré. L'enregistrer avant de fermer&nbsp;?
+              </>
+            )
+          }
+          confirmLabel="Enregistrer"
+          denyLabel="Ne pas enregistrer"
+          cancelLabel="Annuler"
+          onConfirm={async () => {
+            const id = pendingClose.id;
+            const res = await saveTab(id);
+            setPendingClose(null);
+            if (res?.ok) removeTab(id); // sauvegarde annulée -> on garde l'onglet
+          }}
+          onDeny={() => {
+            const id = pendingClose.id;
+            setPendingClose(null);
+            removeTab(id);
+          }}
+          onCancel={() => setPendingClose(null)}
+        />
+      )}
 
       <Toasts toasts={toasts} />
     </div>

@@ -49,6 +49,11 @@ npm run icon     # régénère build/icon.ico
 - **Annuler / Rétablir** (`Ctrl + Z` / `Ctrl + Y`), historique par onglet
   compatible toile infinie (géométrie + bitmap restaurés).
 - **Fichiers** : projet `.strok` ré-éditable (enregistrer / ouvrir) + export PNG.
+- **Sauvegarde automatique** : l'app retient tout votre espace de travail. En
+  quittant, chaque onglet (dessin, vue, onglet actif) est conservé et **restauré
+  à l'identique** au prochain lancement — même les calques jamais enregistrés sur
+  le disque. Fermer un **onglet** modifié propose de l'enregistrer. Voir
+  [Sauvegarde automatique](#sauvegarde-automatique).
 - **Extensions (addons)** : système de plugins — les utilisateurs téléchargent un
   fichier `.strokaddon` et l'importent via le rail de gauche. Voir
   [Extensions (addons)](#extensions-addons).
@@ -106,6 +111,43 @@ bitmap de chaque document persiste naturellement sans recopie manuelle.
 un `.canvas-viewport`. La résolution du canvas ne change pas (zoom raster) ; les
 coordonnées de dessin sont retrouvées en divisant par le zoom (le `rect`
 transformé encode déjà le pan).
+
+## Sauvegarde automatique
+
+Strok distingue **fermer l'application** de **fermer un onglet**.
+
+### Fermer l'application
+
+Rien n'est perdu et **rien n'est demandé**. Tout l'espace de travail est persisté
+en interne (dans `…/AppData/Roaming/Strok/strok-session.json` sous Windows) puis
+**restauré à l'identique** au lancement suivant : tous les onglets, leur dessin,
+leur zoom/pan, le mode clair/sombre **et l'onglet sur lequel vous étiez**. Un
+calque jamais enregistré dans un `.strok` reste donc disponible dans l'app.
+
+Un **autosave** discret réécrit aussi la session quelques secondes après chaque
+modification : en cas de coupure/crash, vous retrouvez quasiment tout.
+
+### Fermer un onglet
+
+Là, Strok vous prévient si vous risquez de perdre quelque chose :
+
+| Onglet… | À la fermeture |
+| --- | --- |
+| vierge, ou inchangé depuis la dernière sauvegarde | se ferme sans rien demander |
+| **modifié, jamais enregistré** | propose de l'enregistrer (dialogue `.strok`) |
+| **modifié, déjà lié à un fichier** | demande d'enregistrer les **dernières modifications** (écrase le fichier) |
+
+La fenêtre de confirmation offre **Enregistrer** / **Ne pas enregistrer** /
+**Annuler** (overlay interne à l'app, pas une fenêtre Windows native ; `Échap` ou
+un clic à l'extérieur = annuler). Si vous annulez le dialogue d'enregistrement,
+l'onglet **n'est pas** fermé.
+
+> Une fois un calque enregistré (ou ouvert depuis un `.strok`), `Ctrl + S` et
+> « Enregistrer les dernières modifications » **réécrivent le même fichier** sans
+> redemander l'emplacement. Par sécurité, seuls les fichiers que vous avez
+> désignés vous-même via un dialogue durant la session sont réinscriptibles en
+> silence ; après un redémarrage de l'app, le premier enregistrement d'un onglet
+> restauré reconfirme l'emplacement.
 
 ## Extensions (addons)
 
@@ -333,12 +375,12 @@ variable absente garde la valeur du thème par défaut.
 ```
 Stroke/
 ├── electron/
-│   ├── main.cjs        # main process durci (IPC fenêtre + fichiers + addons + thèmes)
+│   ├── main.cjs        # main process durci (IPC fenêtre + fichiers + addons + thèmes + session)
 │   └── preload.cjs     # bridge sécurisé (contextIsolation)
 ├── src/
 │   ├── App.jsx         # état global + assemblage + intégration addons/thèmes/toasts
 │   ├── components/     # TitleBar, Sidebar, Toolbar, ColorPicker, Canvas,
-│   │                   #   AddonsModal, ThemesModal, ShortcutsModal
+│   │                   #   AddonsModal, ThemesModal, ShortcutsModal, ConfirmModal
 │   ├── hooks/          # useCanvas (dessin + historique undo/redo)
 │   ├── addons/         # host.js (moteur addons) + useAddons.js (couche React)
 │   ├── themes/         # themeHost.js + builtins.js + useThemes.js
