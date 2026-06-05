@@ -16,9 +16,26 @@ contextBridge.exposeInMainWorld('strok', {
   // Fichiers : projet .strok ré-éditable + export image PNG.
   saveProject: (json, suggestedName) =>
     ipcRenderer.invoke('project:save', { json, suggestedName }),
+  // Écrase en silence un .strok déjà lié (refusé si le chemin n'a pas été choisi
+  // via un dialogue OS pendant cette session).
+  saveProjectTo: (path, json) =>
+    ipcRenderer.invoke('project:saveTo', { path, json }),
   openProject: () => ipcRenderer.invoke('project:open'),
   exportImage: (dataURL, suggestedName) =>
     ipcRenderer.invoke('image:export', { dataURL, suggestedName }),
+
+  // Session : sauvegarde auto / restauration de l'espace de travail.
+  saveSession: (json) => ipcRenderer.invoke('session:save', { json }),
+  loadSession: () => ipcRenderer.invoke('session:load'),
+  clearSession: () => ipcRenderer.invoke('session:clear'),
+  // À la fermeture, le main demande au renderer de persister la session. Le callback
+  // doit appeler `saveSession(...)` puis `sessionFlushed()`. Renvoie une désinscription.
+  onSessionFlush: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('session:flush-request', handler);
+    return () => ipcRenderer.removeListener('session:flush-request', handler);
+  },
+  sessionFlushed: () => ipcRenderer.send('session:flushed'),
 
   // Addons : persistance fichier dans userData (le renderer exécute le code).
   listAddons: () => ipcRenderer.invoke('addons:list'),
