@@ -13,7 +13,7 @@ import useThemes from './themes/useThemes.js';
 const INK_LIGHT = '#111111'; // crayon par défaut sur papier clair
 const INK_DARK = '#d4d4d4'; // crayon coordonné sur papier sombre
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.2';
 const PROJECT_VERSION = 1;
 
 // API Electron (dialogues fichier). Absente sous `vite preview` => fallback navigateur.
@@ -100,7 +100,7 @@ function StatusBar({ tabName, zoom, tool, size, opacity, color }) {
       <div className="statusbar__spacer" />
       <div className="statusbar__item">{tabName}</div>
       <div className="statusbar__item">{Math.round(zoom * 100)} %</div>
-      <div className="statusbar__brand">Strok · v1.0</div>
+      <div className="statusbar__brand">Strok · v1.1.2</div>
     </footer>
   );
 }
