@@ -91,13 +91,13 @@ button {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2c2c2c;
+  background: var(--border-strong);
   border-radius: 6px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3a3a3a;
+  background: var(--icon);
   background-clip: padding-box;
 }
 
@@ -1313,4 +1313,170 @@ button {
 }
 .toast--info {
   border-left: 3px solid var(--text-dim);
+}
+
+/* ============================================================
+   Thèmes (modale) — grille de cartes avec mini-aperçu de l'app
+   ============================================================ */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  padding: 6px;
+}
+.theme-card {
+  position: relative;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-panel-2);
+  overflow: hidden;
+  transition: border-color 0.14s var(--ease), box-shadow 0.14s var(--ease);
+}
+.theme-card:hover {
+  border-color: var(--border-strong);
+}
+.theme-card.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.theme-card.has-error {
+  background: rgba(229, 72, 77, 0.06);
+}
+
+/* Bouton plein-carte (aperçu + infos cliquables pour appliquer). */
+.theme-card__hit {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+}
+.theme-card__hit:disabled {
+  cursor: default;
+}
+
+/* --- Mini-aperçu : reproduit le layout app avec les couleurs du thème --- */
+.theme-card__preview {
+  position: relative;
+  display: flex;
+  height: 84px;
+  padding: 8px;
+  gap: 7px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.theme-card__rail {
+  flex: 0 0 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding-top: 7px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+.theme-card__rail i {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+}
+.theme-card__paper {
+  flex: 1;
+  border-radius: 4px;
+  background: #ffffff;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+}
+.theme-card__panel {
+  flex: 0 0 46px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 9px 7px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+.theme-card__bar {
+  height: 5px;
+  border-radius: 3px;
+  width: 100%;
+}
+.theme-card__bar.is-dim {
+  width: 65%;
+}
+.theme-card__chip {
+  margin-top: 2px;
+  height: 11px;
+  width: 60%;
+  border-radius: 3px;
+}
+.theme-card__broken {
+  display: grid;
+  place-items: center;
+  height: 84px;
+  color: var(--danger);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+/* --- Infos sous l'aperçu --- */
+.theme-card__info {
+  padding: 9px 11px 11px;
+}
+.theme-card__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+.theme-card__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.theme-card__meta {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+.theme-card__ver {
+  font-variant-numeric: tabular-nums;
+}
+.theme-card__err {
+  font-size: 11px;
+  color: var(--danger);
+  margin-top: 4px;
+  line-height: 1.45;
+}
+
+/* --- Bouton supprimer (thèmes importés) --- */
+.theme-card__remove {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.13s var(--ease), background 0.13s var(--ease);
+}
+.theme-card:hover .theme-card__remove {
+  opacity: 1;
+}
+.theme-card__remove:hover {
+  background: var(--danger);
+}
+
+.theme-hint {
+  margin: 10px 8px 4px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  line-height: 1.5;
 }

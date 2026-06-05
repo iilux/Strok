@@ -30,12 +30,17 @@ const DEV_URL = 'http://127.0.0.1:5173';
 const MAX_PROJECT_BYTES = 256 * 1024 * 1024; // 256 Mo de JSON .strok
 const MAX_IMAGE_BYTES = 256 * 1024 * 1024; // 256 Mo de PNG décodé
 const MAX_ADDON_BYTES = 2 * 1024 * 1024; // 2 Mo de code par addon
+const MAX_THEME_BYTES = 256 * 1024; // 256 Ko de JSON par thème
 
 // Extensions reconnues pour un fichier d'addon (script ES/CommonJS « .strokaddon »).
 const ADDON_EXT_RE = /\.(strokaddon|mjs|js)$/i;
+// Extension d'un fichier de thème (JSON déclaratif « .stroktheme »).
+const THEME_EXT_RE = /\.stroktheme$/i;
 // Les addons importés sont copiés ici (persistants entre les sessions). On les
 // range dans userData et JAMAIS dans le bundle de l'app (asar = lecture seule).
 const addonsDir = () => path.join(app.getPath('userData'), 'strok-addons');
+// Idem pour les thèmes importés (JSON, aucun code exécuté).
+const themesDir = () => path.join(app.getPath('userData'), 'strok-themes');
 
 let mainWindow = null;
 
@@ -387,6 +392,112 @@ ipcMain.handle('addons:remove', async (_e, payload) => {
 ipcMain.handle('addons:openFolder', async () => {
   try {
     const dir = await ensureAddonsDir();
+    await shell.openPath(dir);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message) };
+  }
+});
+
+// ───────────────────────── IPC : thèmes (apparence) ─────────────────────────
+// Un thème est un fichier JSON « .stroktheme » que l'utilisateur télécharge puis
+// importe. Comme pour les addons, le main ne fait QUE de la persistance fichier
+// dans userData/strok-themes ; le renderer lit le JSON et applique les variables
+// CSS. Aucun code n'est exécuté (un thème est purement déclaratif).
+
+async function ensureThemesDir() {
+  const dir = themesDir();
+  await fs.mkdir(dir, { recursive: true });
+  return dir;
+}
+
+// Résout un nom de fichier de thème en chemin sûr DANS le dossier des thèmes.
+function resolveThemePath(dir, file) {
+  const base = path.basename(String(file || ''));
+  if (!base || !THEME_EXT_RE.test(base)) return null;
+  const full = path.join(dir, base);
+  if (path.dirname(full) !== dir) return null; // anti path-traversal
+  return full;
+}
+
+ipcMain.handle('themes:list', async () => {
+  try {
+    const dir = await ensureThemesDir();
+    const names = await fs.readdir(dir);
+    const themes = [];
+    for (const name of names) {
+      if (!THEME_EXT_RE.test(name)) continue;
+      try {
+        const full = path.join(dir, name);
+        const stat = await fs.stat(full);
+        if (!stat.isFile() || stat.size > MAX_THEME_BYTES) continue;
+        const code = await fs.readFile(full, 'utf8');
+        themes.push({ file: name, code });
+      } catch {
+        /* fichier illisible : on l'ignore */
+      }
+    }
+    return { ok: true, themes };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message) };
+  }
+});
+
+ipcMain.handle('themes:import', async (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  const dir = await ensureThemesDir();
+  const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    title: 'Importer un thème',
+    properties: ['openFile'],
+    filters: [{ name: 'Thème Strok', extensions: ['stroktheme', 'json'] }],
+  });
+  if (canceled || !filePaths || !filePaths[0]) return { ok: false, canceled: true };
+
+  try {
+    const src = filePaths[0];
+    const stat = await fs.stat(src);
+    if (stat.size > MAX_THEME_BYTES) return { ok: false, error: 'too-large' };
+    const code = await fs.readFile(src, 'utf8');
+
+    // Nom de destination assaini + unique (suffixe « (n) » en cas de collision).
+    let base = path.basename(src).replace(/[\\/:*?"<>|]+/g, '_');
+    if (!THEME_EXT_RE.test(base)) base += '.stroktheme';
+    let dest = path.join(dir, base);
+    let n = 1;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      try {
+        await fs.access(dest);
+      } catch {
+        break; // n'existe pas encore -> nom libre
+      }
+      const ext = path.extname(base);
+      const stem = base.slice(0, base.length - ext.length);
+      dest = path.join(dir, `${stem} (${n})${ext}`);
+      n += 1;
+    }
+    await fs.writeFile(dest, code, 'utf8');
+    return { ok: true, file: path.basename(dest), code };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message) };
+  }
+});
+
+ipcMain.handle('themes:remove', async (_e, payload) => {
+  try {
+    const dir = await ensureThemesDir();
+    const full = resolveThemePath(dir, payload?.file);
+    if (!full) return { ok: false, error: 'bad-file' };
+    await fs.rm(full, { force: true });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message) };
+  }
+});
+
+ipcMain.handle('themes:openFolder', async () => {
+  try {
+    const dir = await ensureThemesDir();
     await shell.openPath(dir);
     return { ok: true };
   } catch (err) {

@@ -52,6 +52,9 @@ npm run icon     # régénère build/icon.ico
 - **Extensions (addons)** : système de plugins — les utilisateurs téléchargent un
   fichier `.strokaddon` et l'importent via le rail de gauche. Voir
   [Extensions (addons)](#extensions-addons).
+- **Thèmes** : changez toute l'esthétique de l'app. 5 thèmes intégrés (défaut,
+  Clair, Nuit, Nord, Sépia) + import de thèmes `.stroktheme` (JSON) sur le même
+  principe que les addons. Voir [Thèmes](#thèmes).
 
 ### Raccourcis
 
@@ -240,21 +243,109 @@ dans `userData/strok-addons` (lister / importer / supprimer / ouvrir le dossier,
 avec garde anti path-traversal et limite de taille) — **le processus principal
 n'exécute jamais ce code**, c'est le renderer qui le charge.
 
+## Thèmes
+
+Comme les addons, mais pour l'**apparence** : un thème change toute l'esthétique
+de l'app (fonds, panneaux, bordures, texte, icônes, accent). Tout le style de
+Strok est piloté par des **variables CSS** sur `:root` — un thème les surcharge,
+et l'interface entière est repeinte.
+
+Contrairement à un addon, un thème est **du JSON purement déclaratif** : il
+n'exécute **aucun code** (ni `new Function`, ni `'unsafe-eval'`). C'est donc
+intrinsèquement plus sûr.
+
+### Pour les utilisateurs
+
+1. **Rail de gauche → icône Thèmes** (palette).
+2. **5 thèmes intégrés** sont proposés d'emblée — cliquez une carte pour
+   l'appliquer instantanément :
+   - **Strok (défaut)** · **Clair** · **Nuit** · **Nord** · **Sépia**.
+3. **« Importer un thème… »** pour ajouter un fichier `.stroktheme` (par ex. ceux
+   de [`examples/themes/`](examples/themes/)).
+   - Alternative : **« Dossier des thèmes »** ouvre le dossier de stockage ; vous
+     pouvez y déposer vos `.stroktheme` à la main (chargés au prochain démarrage).
+4. Le thème choisi est **mémorisé** et ré-appliqué au prochain lancement. Les
+   thèmes importés sont **persistants** (rangés dans
+   `…/AppData/Roaming/Strok/strok-themes` sous Windows) et **supprimables** (les
+   intégrés, non). Chaque carte affiche un **mini-aperçu** de l'app à ses couleurs.
+
+> La **surface de dessin** (le papier) reste indépendante du thème : sa teinte se
+> règle via le bouton **calque clair / sombre** du rail, pas via les thèmes.
+
+### Pour les créateurs de thèmes
+
+Un thème est **un seul fichier JSON** (extension `.stroktheme`), **sans build** :
+
+```json
+{
+  "manifest": {
+    "id": "com.exemple.mon-theme",
+    "name": "Mon thème",
+    "version": "1.0.0",
+    "author": "Votre nom",
+    "description": "Décrivez votre thème en une phrase."
+  },
+  "variables": {
+    "--bg-app": "#0d0d0d",
+    "--bg-panel": "#1a1a1a",
+    "--text-bright": "#e8e8e8",
+    "--accent": "#6d8bff"
+  }
+}
+```
+
+Point de départ recommandé :
+[`examples/themes/TEMPLATE.stroktheme`](examples/themes/TEMPLATE.stroktheme)
+(reprend le thème par défaut avec **toutes** les variables à personnaliser).
+
+#### Variables disponibles
+
+Seules ces clés (couleurs) sont reconnues ; toute autre clé est ignorée. Une
+variable absente garde la valeur du thème par défaut.
+
+| Groupe | Variables |
+| --- | --- |
+| **Fonds** | `--bg-app`, `--bg-canvas-area`, `--bg-panel`, `--bg-panel-2`, `--bg-titlebar`, `--bg-rail` |
+| **Surfaces** | `--surface-hover`, `--surface-active`, `--surface-input` |
+| **Bordures** | `--border`, `--border-soft`, `--border-strong` |
+| **Texte / icônes** | `--text`, `--text-dim`, `--text-bright`, `--icon`, `--icon-hover`, `--icon-active` |
+| **Accent** | `--accent`, `--danger` |
+
+> Les valeurs sont des couleurs CSS (`#rrggbb`, `rgb()`, `hsl()`, mots-clés). Le
+> JSON **n'autorise pas de commentaires** (`//`) — d'où le champ `_help` dans le
+> modèle, simplement ignoré au chargement.
+
+### Sécurité des thèmes
+
+- Un thème est **de la donnée, pas du code** : il est `JSON.parse`é, jamais
+  exécuté. Aucune élévation de la CSP (les thèmes n'ont **pas** besoin de
+  `'unsafe-eval'`, contrairement aux addons).
+- **Liste blanche** : seules les variables cosmétiques ci-dessus sont appliquées,
+  via `setProperty` sur `:root` — un thème **ne peut pas** modifier la mise en
+  page (métriques, polices) ni casser l'app, ni injecter du CSS arbitraire (les
+  valeurs sont validées : pas de `;`, `{`, `}`, `<`, `>`).
+- L'IPC de thèmes (`electron/main.cjs`) ne fait, là encore, que de la
+  **persistance fichier** dans `userData/strok-themes` (mêmes gardes
+  anti path-traversal et limite de taille que les addons).
+
 ## Structure
 
 ```
 Stroke/
 ├── electron/
-│   ├── main.cjs        # main process durci (IPC fenêtre + fichiers + addons)
+│   ├── main.cjs        # main process durci (IPC fenêtre + fichiers + addons + thèmes)
 │   └── preload.cjs     # bridge sécurisé (contextIsolation)
 ├── src/
-│   ├── App.jsx         # état global + assemblage + intégration addons/toasts
+│   ├── App.jsx         # état global + assemblage + intégration addons/thèmes/toasts
 │   ├── components/     # TitleBar, Sidebar, Toolbar, ColorPicker, Canvas,
-│   │                   #   AddonsModal, ShortcutsModal
+│   │                   #   AddonsModal, ThemesModal, ShortcutsModal
 │   ├── hooks/          # useCanvas (dessin + historique undo/redo)
 │   ├── addons/         # host.js (moteur addons) + useAddons.js (couche React)
+│   ├── themes/         # themeHost.js + builtins.js + useThemes.js
 │   └── styles/global.css
-├── examples/addons/    # addons d'exemple (.strokaddon) + TEMPLATE
+├── examples/
+│   ├── addons/         # addons d'exemple (.strokaddon) + TEMPLATE
+│   └── themes/         # thèmes d'exemple (.stroktheme) + TEMPLATE
 ├── build/
 │   ├── generate-icon.cjs
 │   └── icon.ico / icon.png

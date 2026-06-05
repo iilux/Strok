@@ -8,6 +8,7 @@ import {
   FolderOpen,
   Download,
   Puzzle,
+  Palette,
 } from 'lucide-react';
 
 const TOOLS = [
@@ -25,6 +26,7 @@ export default function Sidebar({
   onOpenProject,
   onExportImage,
   onOpenAddons,
+  onOpenThemes,
 }) {
   return (
     <nav className="rail">
@@ -73,6 +75,13 @@ export default function Sidebar({
           onClick={onOpenAddons}
         >
           <Puzzle size={18} strokeWidth={1.6} />
+        </button>
+        <button
+          className="tool-btn tip"
+          data-tip="Thèmes"
+          onClick={onOpenThemes}
+        >
+          <Palette size={18} strokeWidth={1.6} />
         </button>
       </div>
 
