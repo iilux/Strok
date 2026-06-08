@@ -1,331 +1,327 @@
 # Strok
 
-Application desktop de dessin / croquis — **Electron + React (Vite)**.
-UI dark, minimaliste, 100 % custom (aucun élément natif Windows visible).
+Desktop drawing / sketching application — **Electron + React (Vite)**.
+Dark, minimalist UI, 100% custom (no native Windows elements visible).
 
 ## Stack
 
-- **Electron 33** — fenêtre frameless (`frame: false`), titlebar custom.
-- **React 18 + Vite 6** — UI et bundling.
-- **HTML5 Canvas** — moteur de dessin (double canvas main/overlay).
-- **CSS écrit à la main** — pas de Tailwind, pas de Material UI.
-- **lucide-react** — icônes fines monochromes.
+- **Electron 33** — frameless window (`frame: false`), custom titlebar.
+- **React 18 + Vite 6** — UI and bundling.
+- **HTML5 Canvas** — drawing engine (dual main/overlay canvas).
+- **Handwritten CSS** — no Tailwind, no Material UI.
+- **lucide-react** — thin monochrome icons.
 
 ## Scripts
 
 ```bash
-npm install      # installe les dépendances
-npm run dev      # Vite + Electron en mode dev (HMR)
+npm install      # install dependencies
+npm run dev      # Vite + Electron in dev mode (HMR)
 npm run build    # build React (-> dist/)
-npm run dist     # génère release/Strok-Setup-1.3.1.exe (NSIS)
-npm run pack     # build non packagé (release/win-unpacked/) pour test rapide
-npm run icon     # régénère build/icon.ico
+npm run dist     # generate release/Strok-Setup-1.3.1.exe (NSIS)
+npm run pack     # unpackaged build (release/win-unpacked/) for quick testing
+npm run icon     # regenerate build/icon.ico
 ```
 
-`npm run dev` lance Vite (port 5173) puis Electron une fois le serveur prêt.
+`npm run dev` starts Vite (port 5173) then Electron once the server is ready.
 
-## Fonctionnalités
+## Features
 
-- **Canvas** plein écran, papier encadré sur fond sombre pointillé.
-- **Crayon** (trait libre lissé) et **Gomme**.
-- **Taille** et **Opacité** du trait via sliders custom.
-- **Taille à la molette** : `Ctrl + molette` agrandit / rapetisse le pinceau ou
-  la gomme à la volée (pas adaptatif), sans avoir à viser le slider.
-- **Gomme express** : maintenir `Maj` bascule temporairement sur la gomme ;
-  au relâchement, l'outil précédent revient automatiquement.
-- **Color picker** custom : zone saturation/valeur, bandeau de teinte, champ
-  hex, palette de presets, **5 dernières couleurs**.
-- **Onglets multi-documents** type navigateur : ouvrir / fermer / basculer,
-  chacun avec son propre dessin et son propre niveau de zoom.
-- **Mode sombre du calque** : papier teinté comme les menus de l'app (pas noir),
-  le crayon bascule automatiquement vers un gris clair coordonné.
-- **Zoom / dézoom** : `molette` simple (vers le curseur), boutons `−` / `+`,
-  clic sur le `%` pour réinitialiser ; pan au **clic-molette** (glisser).
-- **Titlebar custom** (minimiser / maximiser / fermer) + **anneau de curseur**
-  indiquant la taille du pinceau (suit le zoom).
-- **Aide-mémoire des raccourcis** : un bouton **?** dans la titlebar (juste à
-  côté de « minimiser ») ouvre un **popup intégré** listant tous les raccourcis.
-  Voir [Aide-mémoire des raccourcis](#aide-mémoire-des-raccourcis).
-- **Annuler / Rétablir** (`Ctrl + Z` / `Ctrl + Y`), historique par onglet
-  compatible toile infinie (géométrie + bitmap restaurés).
-- **Fichiers** : projet `.strok` ré-éditable (enregistrer / ouvrir) + export PNG.
-- **Sauvegarde automatique** : l'app retient tout votre espace de travail. En
-  quittant, chaque onglet (dessin, vue, onglet actif) est conservé et **restauré
-  à l'identique** au prochain lancement — même les calques jamais enregistrés sur
-  le disque. Fermer un **onglet** modifié propose de l'enregistrer. Voir
-  [Sauvegarde automatique](#sauvegarde-automatique).
-- **Extensions (addons)** : système de plugins — les utilisateurs téléchargent un
-  fichier `.strokaddon` et l'importent via le rail de gauche. Voir
+- **Fullscreen canvas**, framed paper on a dark dotted background.
+- **Pencil** (smoothed freehand stroke) and **Eraser**.
+- **Size** and **Opacity** via custom sliders.
+- **Scroll-wheel size**: `Ctrl + scroll` increases / decreases the brush or
+  eraser size on the fly (non-adaptive), without having to target the slider.
+- **Quick eraser**: holding `Shift` temporarily switches to the eraser;
+  releasing it automatically restores the previous tool.
+- **Custom color picker**: saturation/value zone, hue strip, hex field,
+  preset palette, **last 5 colors**.
+- **Multi-document tabs** (browser-style): open / close / switch,
+  each with its own drawing and zoom level.
+- **Dark layer mode**: paper tinted like the app menus (not black),
+  the pencil automatically switches to a coordinated light grey.
+- **Zoom / unzoom**: `scroll wheel` (toward cursor), `−` / `+` buttons,
+  click on `%` to reset; pan with **middle-click drag**.
+- **Custom titlebar** (minimize / maximize / close) + **cursor ring**
+  showing brush size (follows zoom).
+- **Shortcuts cheat sheet**: a **?** button in the titlebar (just next to
+  "minimize") opens a **built-in popup** listing all shortcuts.
+  See [Shortcuts cheat sheet](#shortcuts-cheat-sheet).
+- **Undo / Redo** (`Ctrl + Z` / `Ctrl + Y`), per-tab history
+  compatible with infinite canvas (geometry + bitmap restored).
+- **Files**: re-editable `.strok` project (save / open) + PNG export.
+- **Autosave**: the app remembers your entire workspace. On quit,
+  every tab (drawing, view, active tab) is persisted and **restored
+  identically** on next launch — even layers never saved to disk.
+  Closing a **modified tab** prompts to save. See
+  [Autosave](#autosave).
+- **Extensions (addons)**: plugin system — users download a
+  `.strokaddon` file and import it via the left rail. See
   [Extensions (addons)](#extensions-addons).
-- **Thèmes** : changez toute l'esthétique de l'app. 5 thèmes intégrés (défaut,
-  Clair, Nuit, Nord, Sépia) + import de thèmes `.stroktheme` (JSON) sur le même
-  principe que les addons. Voir [Thèmes](#thèmes).
+- **Themes**: change the entire app aesthetic. 5 built-in themes (default,
+  Light, Night, Nord, Sepia) + import `.stroktheme` files (JSON) following
+  the same principle as addons. See [Themes](#themes).
 
-### Raccourcis
+### Shortcuts
 
-| Touche | Action |
+| Key | Action |
 | --- | --- |
-| `B` / `E` | Crayon / Gomme |
-| `Maj` (maintenu) | Gomme temporaire (restaure l'outil au relâchement) |
-| `Ctrl + Z` | Annuler |
-| `Ctrl + Y` / `Ctrl + Maj + Z` | Rétablir |
-| `Ctrl + S` / `Ctrl + O` | Enregistrer / Ouvrir un projet `.strok` |
-| `Ctrl + Maj + E` | Exporter en PNG |
-| `Ctrl + T` | Nouvel onglet |
-| `Ctrl + W` | Fermer l'onglet actif |
-| `Ctrl + 0` | Réinitialiser le zoom |
-| `molette` | Zoomer / dézoomer (vers le curseur) |
-| `Ctrl + molette` | Taille du pinceau / gomme |
-| `clic-molette` (glisser) | Déplacer la toile (pan) |
+| `B` / `E` | Pencil / Eraser |
+| `Shift` (held) | Temporary eraser (restores tool on release) |
+| `Ctrl + Z` | Undo |
+| `Ctrl + Y` / `Ctrl + Shift + Z` | Redo |
+| `Ctrl + S` / `Ctrl + O` | Save / Open a `.strok` project |
+| `Ctrl + Shift + E` | Export as PNG |
+| `Ctrl + T` | New tab |
+| `Ctrl + W` | Close active tab |
+| `Ctrl + 0` | Reset zoom |
+| `scroll wheel` | Zoom in / out (toward cursor) |
+| `Ctrl + scroll wheel` | Brush / eraser size |
+| `middle-click drag` | Pan the canvas |
 
-> 💡 Cette même liste est consultable **dans l'app** via le bouton **?** de la
-> titlebar — cf. [Aide-mémoire des raccourcis](#aide-mémoire-des-raccourcis).
+> 💡 This same list is available **inside the app** via the **?** button in the
+> titlebar — see [Shortcuts cheat sheet](#shortcuts-cheat-sheet).
 
-### Aide-mémoire des raccourcis
+### Shortcuts cheat sheet
 
-Un bouton **?** est placé dans la titlebar, **juste à gauche du bouton
-« minimiser »** (le trait `—`). Au clic, il ouvre un **popup intégré** récapitulant
-tous les raccourcis, regroupés par thème (Outils, Édition, Fichiers, Onglets, Vue).
+A **?** button is placed in the titlebar, **just to the left of the
+"minimize" button** (the `—` dash). Clicking it opens a **built-in popup**
+summarizing all shortcuts, grouped by category (Tools, Edit, Files, Tabs, View).
 
-Comment il réagit :
+How it behaves:
 
-- Ce **n'est pas une vraie fenêtre OS** : c'est un overlay rendu **dans l'app**
-  (même mécanique que la modale [Extensions (addons)](#extensions-addons)).
-- L'**app derrière est floutée** (effet `backdrop-filter`) tant que le popup est
-  ouvert.
-- On le **ferme** de trois façons : la **petite croix** en haut à droite du popup,
-  un **clic sur l'app floutée** (en dehors de la carte), ou la touche **`Échap`**.
+- This is **not a real OS window**: it's an overlay rendered **inside the app**
+  (same mechanism as the [Extensions (addons)](#extensions-addons) modal).
+- The **app behind is blurred** (`backdrop-filter` effect) while the popup is open.
+- It can be **closed** in three ways: the **small × button** in the top-right
+  corner of the popup, a **click on the blurred app** (outside the card), or
+  pressing **`Esc`**.
 
-### Architecture du dessin
+### Drawing architecture
 
-Deux canvases empilés assurent une **opacité uniforme** : le trait en cours est
-tracé à pleine opacité sur l'`overlay`, puis aplati sur le canvas `main` au
-relâchement avec l'opacité choisie (évite l'accumulation sombre aux
-recouvrements). Lissage par courbes quadratiques + `getCoalescedEvents()` pour
-un tracé fluide sans latence (pas besoin de batcher en rAF).
+Two stacked canvases ensure **uniform opacity**: the current stroke is drawn
+at full opacity on the `overlay`, then flattened onto the `main` canvas on
+pointer up with the chosen opacity (avoids dark accumulation at overlaps).
+Smoothing via quadratic curves + `getCoalescedEvents()` for a fluid stroke
+with no latency (no need to batch in rAF).
 
-**Onglets** : un `<Canvas>` est monté par onglet (seul l'actif est visible) — le
-bitmap de chaque document persiste naturellement sans recopie manuelle.
+**Tabs**: one `<Canvas>` is mounted per tab (only the active one is visible) —
+each document's bitmap persists naturally without manual copying.
 
-**Zoom / pan** : appliqués via une transformation CSS (`translate` + `scale`) sur
-un `.canvas-viewport`. La résolution du canvas ne change pas (zoom raster) ; les
-coordonnées de dessin sont retrouvées en divisant par le zoom (le `rect`
-transformé encode déjà le pan).
+**Zoom / pan**: applied via a CSS transform (`translate` + `scale`) on a
+`.canvas-viewport`. Canvas resolution does not change (raster zoom); drawing
+coordinates are recovered by dividing by the zoom (the transformed `rect`
+already encodes the pan).
 
-## Sauvegarde automatique
+## Autosave
 
-Strok distingue **fermer l'application** de **fermer un onglet**.
+Strok distinguishes between **closing the application** and **closing a tab**.
 
-### Fermer l'application
+### Closing the application
 
-Rien n'est perdu et **rien n'est demandé**. Tout l'espace de travail est persisté
-en interne (dans `…/AppData/Roaming/Strok/strok-session.json` sous Windows) puis
-**restauré à l'identique** au lancement suivant : tous les onglets, leur dessin,
-leur zoom/pan, le mode clair/sombre **et l'onglet sur lequel vous étiez**. Un
-calque jamais enregistré dans un `.strok` reste donc disponible dans l'app.
+Nothing is lost and **nothing is asked**. The entire workspace is persisted
+internally (in `…/AppData/Roaming/Strok/strok-session.json` on Windows) then
+**restored identically** on next launch: all tabs, their drawing,
+their zoom/pan, light/dark mode **and the tab you were on**. A layer never
+saved to a `.strok` file remains available in the app.
 
-Un **autosave** discret réécrit aussi la session quelques secondes après chaque
-modification : en cas de coupure/crash, vous retrouvez quasiment tout.
+A quiet **autosave** also rewrites the session a few seconds after each
+change: in case of a crash/power cut, you recover almost everything.
 
-### Fermer un onglet
+### Closing a tab
 
-Là, Strok vous prévient si vous risquez de perdre quelque chose :
+Here, Strok warns you if you risk losing something:
 
-| Onglet… | À la fermeture |
+| Tab… | On close |
 | --- | --- |
-| vierge, ou inchangé depuis la dernière sauvegarde | se ferme sans rien demander |
-| **modifié, jamais enregistré** | propose de l'enregistrer (dialogue `.strok`) |
-| **modifié, déjà lié à un fichier** | demande d'enregistrer les **dernières modifications** (écrase le fichier) |
+| blank, or unchanged since last save | closes without asking |
+| **modified, never saved** | prompts to save (`.strok` dialog) |
+| **modified, already linked to a file** | asks to save the **latest changes** (overwrites the file) |
 
-La fenêtre de confirmation offre **Enregistrer** / **Ne pas enregistrer** /
-**Annuler** (overlay interne à l'app, pas une fenêtre Windows native ; `Échap` ou
-un clic à l'extérieur = annuler). Si vous annulez le dialogue d'enregistrement,
-l'onglet **n'est pas** fermé.
+The confirmation dialog offers **Save** / **Don't save** /
+**Cancel** (internal app overlay, not a native Windows window; `Esc` or a click
+outside = cancel). If you cancel the save dialog, the tab is **not** closed.
 
-> Une fois un calque enregistré (ou ouvert depuis un `.strok`), `Ctrl + S` et
-> « Enregistrer les dernières modifications » **réécrivent le même fichier** sans
-> redemander l'emplacement. Par sécurité, seuls les fichiers que vous avez
-> désignés vous-même via un dialogue durant la session sont réinscriptibles en
-> silence ; après un redémarrage de l'app, le premier enregistrement d'un onglet
-> restauré reconfirme l'emplacement.
+> Once a layer is saved (or opened from a `.strok`), `Ctrl + S` and
+> "Save latest changes" **overwrite the same file** without asking for the
+> location again. For safety, only files you explicitly designated yourself via
+> an OS dialog during the session are silently rewritable; after an app restart,
+> the first save of a restored tab reconfirms the location.
 
 ## Extensions (addons)
 
-Strok est extensible par des **addons** : de petits scripts que **n'importe qui
-peut écrire**, partager / **télécharger ailleurs**, puis **importer** dans l'app
-via un bouton. Il n'y a **aucune boutique intégrée** — on importe un fichier.
+Strok is extensible via **addons**: small scripts that **anyone can write**,
+share / **download elsewhere**, then **import** into the app via a button.
+There is **no built-in store** — you import a file.
 
-### Pour les utilisateurs
+### For users
 
-1. Récupérez un fichier **`.strokaddon`** (par ex. ceux de
+1. Get a **`.strokaddon`** file (e.g. the ones in
    [`examples/addons/`](examples/addons/)).
-2. Dans Strok : **rail de gauche → icône Extensions** (pièce de puzzle).
-3. **« Importer un addon… »** et choisissez le fichier.
-   - Alternative : **« Dossier des addons »** ouvre le dossier de stockage ; vous
-     pouvez y déposer vos `.strokaddon` à la main (chargés au prochain démarrage).
-4. Les addons sont **persistants** (rangés dans
-   `…/AppData/Roaming/Strok/strok-addons` sous Windows). Chaque ligne a un
-   **interrupteur** (activer / désactiver) et un bouton **supprimer**.
-5. Les commandes ajoutées par les addons apparaissent dans la modale **et** dans
-   la section « Extensions » du panneau de droite.
+2. In Strok: **left rail → Extensions icon** (puzzle piece).
+3. **"Import an addon…"** and choose the file.
+   - Alternative: **"Addons folder"** opens the storage folder; you can
+     drop your `.strokaddon` files there manually (loaded on next startup).
+4. Addons are **persistent** (stored in
+   `…/AppData/Roaming/Strok/strok-addons` on Windows). Each row has an
+   **toggle switch** (enable / disable) and a **delete** button.
+5. Commands added by addons appear in the modal **and** in the "Extensions"
+   section of the right panel.
 
-> ⚠️ Un addon est du code qui s'exécute dans l'app.
-> **N'installez que des addons dont vous avez confiance dans la source.**
-> Ils restent toutefois confinés (cf. [Sécurité des addons](#sécurité-des-addons)).
+> ⚠️ An addon is code that runs inside the app.
+> **Only install addons whose source you trust.**
+> They are however sandboxed (see [Addon security](#addon-security)).
 
-### Pour les développeurs d'addons
+### For addon developers
 
-Un addon est **un seul fichier JavaScript** (extension `.strokaddon`), **sans
-build**. Il renseigne un objet `module` :
+An addon is **a single JavaScript file** (`.strokaddon` extension), **no
+build required**. It populates a `module` object:
 
 ```js
 module.manifest = {
-  id: 'com.exemple.mon-addon',   // identifiant unique (reverse-DNS conseillé)
-  name: 'Mon addon',
+  id: 'com.example.my-addon',   // unique identifier (reverse-DNS recommended)
+  name: 'My addon',
   version: '1.0.0',
-  author: 'Votre nom',
-  description: 'Ce que fait votre addon, en une phrase.',
+  author: 'Your name',
+  description: 'What your addon does, in one sentence.',
 };
 
 module.activate = function (strok) {
   strok.addCommand({
     id: 'hello',
-    label: 'Dire bonjour',
-    run: () => strok.notify(`Couleur courante : ${strok.getColor()}`),
+    label: 'Say hello',
+    run: () => strok.notify(`Current color: ${strok.getColor()}`),
   });
-  // Renvoyez éventuellement un nettoyage, exécuté à la désactivation/suppression.
+  // Optionally return a cleanup function, called on deactivation/deletion.
   return { deactivate: () => {} };
 };
 ```
 
-> `module.exports = { manifest, activate }` et `exports.activate = …` marchent
-> aussi. `activate(strok)` est appelé une fois au chargement. Point de départ
-> recommandé : [`examples/addons/TEMPLATE.strokaddon`](examples/addons/TEMPLATE.strokaddon).
+> `module.exports = { manifest, activate }` and `exports.activate = …` also
+> work. `activate(strok)` is called once on load. Recommended starting point:
+> [`examples/addons/TEMPLATE.strokaddon`](examples/addons/TEMPLATE.strokaddon).
 
-#### API `strok`
+#### `strok` API
 
-**Pinceau / outil**
+**Brush / tool**
 
-| Méthode | Description |
+| Method | Description |
 | --- | --- |
-| `getColor()` / `setColor('#rrggbb')` | Couleur (l'écriture l'ajoute aux récentes) |
-| `getTool()` / `setTool(id)` | Outil — `'pencil'` ou `'eraser'` |
-| `getSize()` / `setSize(px)` | Taille du pinceau (1–100) |
-| `getOpacity()` / `setOpacity(0..1)` | Opacité |
+| `getColor()` / `setColor('#rrggbb')` | Color (writing adds it to recents) |
+| `getTool()` / `setTool(id)` | Tool — `'pencil'` or `'eraser'` |
+| `getSize()` / `setSize(px)` | Brush size (1–100) |
+| `getOpacity()` / `setOpacity(0..1)` | Opacity |
 
-**Calque actif**
+**Active layer**
 
-| Méthode | Description |
+| Method | Description |
 | --- | --- |
-| `getContext()` | `CanvasRenderingContext2D` (transform dpr posée → dessin en **px CSS**). `null` si aucun calque. |
-| `getCanvasInfo()` | `{ width, height` (px **physiques**)`, dpr, doc:{ x, y, w, h }` (px CSS)` }` |
-| `commit()` | À appeler **après** avoir dessiné : valide l'édition dans l'undo/redo |
+| `getContext()` | `CanvasRenderingContext2D` (dpr transform applied → draw in **CSS px**). `null` if no layer. |
+| `getCanvasInfo()` | `{ width, height` (physical **px**)`, dpr, doc:{ x, y, w, h }` (CSS px)` }` |
+| `commit()` | Call **after** drawing: validates the edit into undo/redo |
 
-> Dessin vectoriel (`fillRect`, `stroke`…) → dimensions `doc.w / doc.h` (px CSS).
-> Accès pixel (`getImageData` / `putImageData`) → `width / height` (px physiques),
-> car ces méthodes ignorent la transform.
+> Vector drawing (`fillRect`, `stroke`…) → use `doc.w / doc.h` dimensions (CSS px).
+> Pixel access (`getImageData` / `putImageData`) → use `width / height` (physical px),
+> as these methods ignore the transform.
 
 **Contributions**
 
-| Méthode | Description |
+| Method | Description |
 | --- | --- |
-| `addCommand({ id, label, run })` | Ajoute un bouton-commande. Renvoie une fonction de retrait. |
+| `addCommand({ id, label, run })` | Adds a command button. Returns a removal function. |
 
-**Événements** (renvoient une fonction de désabonnement)
+**Events** (return an unsubscribe function)
 
-| Événement | Charge utile | Déclenché… |
+| Event | Payload | Fired… |
 | --- | --- | --- |
-| `on('strokeEnd', fn)` | — | après chaque trait validé |
-| `on('colorChange', fn)` | `hex` | quand la couleur change |
-| `on('toolChange', fn)` | `id` | quand l'outil change |
+| `on('strokeEnd', fn)` | — | after each committed stroke |
+| `on('colorChange', fn)` | `hex` | when the color changes |
+| `on('toolChange', fn)` | `id` | when the tool changes |
 
-**Divers**
+**Misc**
 
-| Méthode | Description |
+| Method | Description |
 | --- | --- |
-| `notify(msg, type?)` | Toast — `'info'` (défaut) / `'success'` / `'error'` |
-| `storage.get(key, fallback)` · `set(key, val)` · `remove(key)` | Stockage persistant **isolé par addon** |
-| `version` | Version de l'app hôte |
-| `manifest` | Le manifeste de votre propre addon |
+| `notify(msg, type?)` | Toast — `'info'` (default) / `'success'` / `'error'` |
+| `storage.get(key, fallback)` · `set(key, val)` · `remove(key)` | Persistent storage **isolated per addon** |
+| `version` | Host app version |
+| `manifest` | Your own addon's manifest |
 
-#### Exemples fournis
+#### Provided examples
 
-| Fichier | Démontre |
+| File | Demonstrates |
 | --- | --- |
-| [`fill-background.strokaddon`](examples/addons/fill-background.strokaddon) | `addCommand`, dessin vectoriel, `commit` |
-| [`invert-colors.strokaddon`](examples/addons/invert-colors.strokaddon) | accès pixel `getImageData` / `putImageData` |
-| [`rainbow-stroke.strokaddon`](examples/addons/rainbow-stroke.strokaddon) | événements, `storage`, `deactivate` |
-| [`TEMPLATE.strokaddon`](examples/addons/TEMPLATE.strokaddon) | squelette commenté + API complète |
+| [`fill-background.strokaddon`](examples/addons/fill-background.strokaddon) | `addCommand`, vector drawing, `commit` |
+| [`invert-colors.strokaddon`](examples/addons/invert-colors.strokaddon) | pixel access `getImageData` / `putImageData` |
+| [`rainbow-stroke.strokaddon`](examples/addons/rainbow-stroke.strokaddon) | events, `storage`, `deactivate` |
+| [`TEMPLATE.strokaddon`](examples/addons/TEMPLATE.strokaddon) | commented skeleton + full API |
 
-Pour **distribuer** un addon, partagez simplement son fichier `.strokaddon`.
-Choisissez un `id` de manifeste **unique** : il sert d'espace de noms pour
-`storage`.
+To **distribute** an addon, simply share its `.strokaddon` file.
+Choose a **unique** manifest `id`: it serves as the namespace for `storage`.
 
-### Sécurité des addons
+### Addon security
 
-Le code d'un addon tourne dans le **renderer durci** d'Electron :
+An addon's code runs inside Electron's **hardened renderer**:
 
-- **`contextIsolation` + `sandbox` + `nodeIntegration:false`** → **aucun** accès
-  Node ni au système de fichiers.
-- **CSP `default-src 'self'`** → impossible de charger un script externe ou de
-  **contacter le réseau** → pas d'exfiltration de données.
-- **Navigation verrouillée** à l'origine de l'app ; ouverture de fenêtres refusée.
+- **`contextIsolation` + `sandbox` + `nodeIntegration:false`** → **no** access
+  to Node or the file system.
+- **CSP `default-src 'self'`** → impossible to load an external script or
+  **reach the network** → no data exfiltration.
+- **Navigation locked** to the app's origin; opening new windows is refused.
 
-Pour exécuter le code d'addon, la CSP de **production** autorise
-`script-src 'self' 'unsafe-eval'` (lancement via `new Function`). C'est
-**nécessaire et assumé** — sans cela, aucun addon ne peut tourner — et cela
-**n'ouvre pas** de voie d'injection distante puisque `default-src 'self'`
-interdit déjà de récupérer le moindre contenu externe. Le pire qu'un addon
-malveillant puisse faire est de manipuler la toile en cours d'exécution ; il ne
-peut **ni** toucher vos fichiers **ni** téléphoner à un serveur. Restez prudent :
-**n'installez que ce dont vous avez confiance dans la source.**
+To execute addon code, the **production** CSP allows
+`script-src 'self' 'unsafe-eval'` (invocation via `new Function`). This is
+**necessary and intentional** — without it, no addon can run — and it
+**does not open** a remote injection path since `default-src 'self'`
+already prevents fetching any external content. The worst a malicious addon
+can do is manipulate the current canvas; it can **neither** touch your files
+**nor** phone home to a server. Stay cautious:
+**only install addons from sources you trust.**
 
-L'IPC d'addons (`electron/main.cjs`) ne fait que de la **persistance fichier**
-dans `userData/strok-addons` (lister / importer / supprimer / ouvrir le dossier,
-avec garde anti path-traversal et limite de taille) — **le processus principal
-n'exécute jamais ce code**, c'est le renderer qui le charge.
+The addons IPC (`electron/main.cjs`) only handles **file persistence**
+in `userData/strok-addons` (list / import / delete / open folder,
+with path-traversal guard and size limit) — **the main process never executes
+this code**, it's the renderer that loads it.
 
-## Thèmes
+## Themes
 
-Comme les addons, mais pour l'**apparence** : un thème change toute l'esthétique
-de l'app (fonds, panneaux, bordures, texte, icônes, accent). Tout le style de
-Strok est piloté par des **variables CSS** sur `:root` — un thème les surcharge,
-et l'interface entière est repeinte.
+Like addons, but for **appearance**: a theme changes the entire app aesthetic
+(backgrounds, panels, borders, text, icons, accent). Strok's entire style is
+driven by **CSS variables** on `:root` — a theme overrides them, and the whole
+interface is repainted.
 
-Contrairement à un addon, un thème est **du JSON purement déclaratif** : il
-n'exécute **aucun code** (ni `new Function`, ni `'unsafe-eval'`). C'est donc
-intrinsèquement plus sûr.
+Unlike an addon, a theme is **purely declarative JSON**: it executes **no code**
+(no `new Function`, no `'unsafe-eval'`). It is therefore inherently safer.
 
-### Pour les utilisateurs
+### For users
 
-1. **Rail de gauche → icône Thèmes** (palette).
-2. **5 thèmes intégrés** sont proposés d'emblée — cliquez une carte pour
-   l'appliquer instantanément :
-   - **Strok (défaut)** · **Clair** · **Nuit** · **Nord** · **Sépia**.
-3. **« Importer un thème… »** pour ajouter un fichier `.stroktheme` (par ex. ceux
-   de [`examples/themes/`](examples/themes/)).
-   - Alternative : **« Dossier des thèmes »** ouvre le dossier de stockage ; vous
-     pouvez y déposer vos `.stroktheme` à la main (chargés au prochain démarrage).
-4. Le thème choisi est **mémorisé** et ré-appliqué au prochain lancement. Les
-   thèmes importés sont **persistants** (rangés dans
-   `…/AppData/Roaming/Strok/strok-themes` sous Windows) et **supprimables** (les
-   intégrés, non). Chaque carte affiche un **mini-aperçu** de l'app à ses couleurs.
+1. **Left rail → Themes icon** (palette).
+2. **5 built-in themes** are available right away — click a card to apply
+   it instantly:
+   - **Strok (default)** · **Light** · **Night** · **Nord** · **Sepia**.
+3. **"Import a theme…"** to add a `.stroktheme` file (e.g. the ones in
+   [`examples/themes/`](examples/themes/)).
+   - Alternative: **"Themes folder"** opens the storage folder; you can
+     drop your `.stroktheme` files there manually (loaded on next startup).
+4. The chosen theme is **remembered** and re-applied on next launch. Imported
+   themes are **persistent** (stored in
+   `…/AppData/Roaming/Strok/strok-themes` on Windows) and **deletable** (built-in
+   ones are not). Each card shows a **mini-preview** of the app in its colors.
 
-> La **surface de dessin** (le papier) reste indépendante du thème : sa teinte se
-> règle via le bouton **calque clair / sombre** du rail, pas via les thèmes.
+> The **drawing surface** (the paper) is independent from the theme: its tint is
+> controlled via the **light / dark layer button** on the rail, not via themes.
 
-### Pour les créateurs de thèmes
+### For theme creators
 
-Un thème est **un seul fichier JSON** (extension `.stroktheme`), **sans build** :
+A theme is **a single JSON file** (`.stroktheme` extension), **no build required**:
 
 ```json
 {
   "manifest": {
-    "id": "com.exemple.mon-theme",
-    "name": "Mon thème",
+    "id": "com.example.my-theme",
+    "name": "My theme",
     "version": "1.0.0",
-    "author": "Votre nom",
-    "description": "Décrivez votre thème en une phrase."
+    "author": "Your name",
+    "description": "Describe your theme in one sentence."
   },
   "variables": {
     "--bg-app": "#0d0d0d",
@@ -336,58 +332,57 @@ Un thème est **un seul fichier JSON** (extension `.stroktheme`), **sans build**
 }
 ```
 
-Point de départ recommandé :
+Recommended starting point:
 [`examples/themes/TEMPLATE.stroktheme`](examples/themes/TEMPLATE.stroktheme)
-(reprend le thème par défaut avec **toutes** les variables à personnaliser).
+(contains the default theme with **all** customizable variables).
 
-#### Variables disponibles
+#### Available variables
 
-Seules ces clés (couleurs) sont reconnues ; toute autre clé est ignorée. Une
-variable absente garde la valeur du thème par défaut.
+Only these keys (colors) are recognized; any other key is ignored. A missing
+variable keeps the default theme value.
 
-| Groupe | Variables |
+| Group | Variables |
 | --- | --- |
-| **Fonds** | `--bg-app`, `--bg-canvas-area`, `--bg-panel`, `--bg-panel-2`, `--bg-titlebar`, `--bg-rail` |
+| **Backgrounds** | `--bg-app`, `--bg-canvas-area`, `--bg-panel`, `--bg-panel-2`, `--bg-titlebar`, `--bg-rail` |
 | **Surfaces** | `--surface-hover`, `--surface-active`, `--surface-input` |
-| **Bordures** | `--border`, `--border-soft`, `--border-strong` |
-| **Texte / icônes** | `--text`, `--text-dim`, `--text-bright`, `--icon`, `--icon-hover`, `--icon-active` |
+| **Borders** | `--border`, `--border-soft`, `--border-strong` |
+| **Text / icons** | `--text`, `--text-dim`, `--text-bright`, `--icon`, `--icon-hover`, `--icon-active` |
 | **Accent** | `--accent`, `--danger` |
 
-> Les valeurs sont des couleurs CSS (`#rrggbb`, `rgb()`, `hsl()`, mots-clés). Le
-> JSON **n'autorise pas de commentaires** (`//`) — d'où le champ `_help` dans le
-> modèle, simplement ignoré au chargement.
+> Values are CSS colors (`#rrggbb`, `rgb()`, `hsl()`, keywords). JSON **does not
+> allow comments** (`//`) — hence the `_help` field in the template, which is
+> simply ignored on load.
 
-### Sécurité des thèmes
+### Theme security
 
-- Un thème est **de la donnée, pas du code** : il est `JSON.parse`é, jamais
-  exécuté. Aucune élévation de la CSP (les thèmes n'ont **pas** besoin de
-  `'unsafe-eval'`, contrairement aux addons).
-- **Liste blanche** : seules les variables cosmétiques ci-dessus sont appliquées,
-  via `setProperty` sur `:root` — un thème **ne peut pas** modifier la mise en
-  page (métriques, polices) ni casser l'app, ni injecter du CSS arbitraire (les
-  valeurs sont validées : pas de `;`, `{`, `}`, `<`, `>`).
-- L'IPC de thèmes (`electron/main.cjs`) ne fait, là encore, que de la
-  **persistance fichier** dans `userData/strok-themes` (mêmes gardes
-  anti path-traversal et limite de taille que les addons).
+- A theme is **data, not code**: it is `JSON.parse`d, never executed. No CSP
+  elevation needed (themes do **not** require `'unsafe-eval'`, unlike addons).
+- **Allowlist**: only the cosmetic variables listed above are applied,
+  via `setProperty` on `:root` — a theme **cannot** modify layout
+  (metrics, fonts) or break the app, nor inject arbitrary CSS (values are
+  validated: no `;`, `{`, `}`, `<`, `>`).
+- The themes IPC (`electron/main.cjs`) likewise only handles
+  **file persistence** in `userData/strok-themes` (same path-traversal guard
+  and size limit as addons).
 
 ## Structure
 
 ```
 Stroke/
 ├── electron/
-│   ├── main.cjs        # main process durci (IPC fenêtre + fichiers + addons + thèmes + session)
-│   └── preload.cjs     # bridge sécurisé (contextIsolation)
+│   ├── main.cjs        # hardened main process (IPC window + files + addons + themes + session)
+│   └── preload.cjs     # secure bridge (contextIsolation)
 ├── src/
-│   ├── App.jsx         # état global + assemblage + intégration addons/thèmes/toasts
+│   ├── App.jsx         # global state + assembly + addon/theme/toast integration
 │   ├── components/     # TitleBar, Sidebar, Toolbar, ColorPicker, Canvas,
 │   │                   #   AddonsModal, ThemesModal, ShortcutsModal, ConfirmModal
-│   ├── hooks/          # useCanvas (dessin + historique undo/redo)
-│   ├── addons/         # host.js (moteur addons) + useAddons.js (couche React)
+│   ├── hooks/          # useCanvas (drawing + undo/redo history)
+│   ├── addons/         # host.js (addon engine) + useAddons.js (React layer)
 │   ├── themes/         # themeHost.js + builtins.js + useThemes.js
 │   └── styles/global.css
 ├── examples/
-│   ├── addons/         # addons d'exemple (.strokaddon) + TEMPLATE
-│   └── themes/         # thèmes d'exemple (.stroktheme) + TEMPLATE
+│   ├── addons/         # example addons (.strokaddon) + TEMPLATE
+│   └── themes/         # example themes (.stroktheme) + TEMPLATE
 ├── build/
 │   ├── generate-icon.cjs
 │   └── icon.ico / icon.png
@@ -397,38 +392,39 @@ Stroke/
 └── package.json
 ```
 
-## Sécurité
+## Security
 
-Durcissement appliqué côté Electron et build :
+Hardening applied on the Electron side and build:
 
-- **Isolation du renderer** : `contextIsolation` + `sandbox` + `nodeIntegration: false`
-  — le renderer ne peut faire que les appels IPC explicitement exposés par
-  `preload.cjs`, aucun accès direct à Node ou au système.
-- **Pas de fuite réseau** : navigation verrouillée à l'origine de l'app
-  (`will-navigate`), nouvelles fenêtres refusées (`setWindowOpenHandler`), aucune
-  permission web accordée, CSP strict `default-src 'self'` en production. (La
-  CSP de prod autorise `script-src 'self' 'unsafe-eval'` **uniquement** pour
-  exécuter les addons — cf. [Sécurité des addons](#sécurité-des-addons).)
-- **Protection du code** : DevTools désactivés en production (+ raccourcis
-  inspecteur neutralisés, menu applicatif supprimé) ; build minifié **sans
-  source-maps**, `console.*` retirés.
-- **Validation IPC** : taille des projets/images plafonnée, écritures fichier
-  toujours via un dialogue OS (chemin choisi par l'utilisateur).
+- **Renderer isolation**: `contextIsolation` + `sandbox` + `nodeIntegration: false`
+  — the renderer can only make IPC calls explicitly exposed by
+  `preload.cjs`, no direct access to Node or the system.
+- **No network leak**: navigation locked to the app's origin
+  (`will-navigate`), new windows refused (`setWindowOpenHandler`), no web
+  permission granted, strict `default-src 'self'` CSP in production. (The
+  prod CSP allows `script-src 'self' 'unsafe-eval'` **only** to execute
+  addons — see [Addon security](#addon-security).)
+- **Code protection**: DevTools disabled in production (+ inspector shortcuts
+  neutralized, app menu removed); minified build **without source maps**,
+  `console.*` stripped.
+- **IPC validation**: project/image size capped, file writes always go through
+  an OS dialog (path chosen by the user).
 
-> Limite assumée : un `.exe` Electron exécute du code sur la machine cible et
-> l'`app.asar` est extractible — le durcissement **élève la barre**, il ne rend
-> pas le code source inviolable.
+> Known limitation: an Electron `.exe` executes code on the target machine and
+> the `app.asar` is extractable — hardening **raises the bar**, it does not make
+> the source code tamper-proof.
 
-## Build du `.exe` — note importante
+## Building the `.exe` — important note
 
-La **signature de code est désactivée** dans `npm run dist`
-(`CSC_IDENTITY_AUTO_DISCOVERY=false`). Cela évite l'extraction du paquet
-`winCodeSign` d'electron-builder, qui échoue sous Windows sans le privilège de
-création de liens symboliques (Developer Mode désactivé / hors admin). L'`.exe`
-généré reste **autonome** (Node + Chromium embarqués) ; il sera simplement non
-signé. Pour signer plus tard, fournir un certificat via `CSC_LINK` / `CSC_KEY_PASSWORD`.
+**Code signing is disabled** in `npm run dist`
+(`CSC_IDENTITY_AUTO_DISCOVERY=false`). This avoids extracting the
+`winCodeSign` package from electron-builder, which fails on Windows without
+the symbolic link creation privilege (Developer Mode disabled / non-admin).
+The generated `.exe` remains **self-contained** (Node + Chromium bundled); it
+will simply be unsigned. To sign later, provide a certificate via
+`CSC_LINK` / `CSC_KEY_PASSWORD`.
 
-## Reste à faire
+## To do
 
-Formes (ligne / rectangle / ellipse), remplissage, pipette, export JPG,
-splash screen. _(Zoom, fichiers `.strok`/PNG et undo/redo déjà implémentés.)_
+Shapes (line / rectangle / ellipse), fill, color picker tool, JPG export,
+splash screen. _(Zoom, `.strok`/PNG files, and undo/redo already implemented.)_
