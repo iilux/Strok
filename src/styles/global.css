@@ -1517,3 +1517,186 @@ button {
   color: var(--text-dim);
   line-height: 1.5;
 }
+
+/* ============================================================
+   Fenêtres d'addon (flottantes, déplaçables, thémées)
+   Créées en DOM pur par AddonWindowManager (cf. src/addons/windows.js).
+   ============================================================ */
+.addon-window__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 8, 8, 0.5);
+  animation: modal-fade 0.14s var(--ease);
+}
+.addon-window__backdrop--blur {
+  backdrop-filter: blur(7px) saturate(0.9);
+}
+
+.addon-window {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  animation: modal-pop 0.16s var(--ease);
+}
+.addon-window__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 8px 8px 13px;
+  border-bottom: 1px solid var(--border-soft);
+  flex: 0 0 auto;
+  cursor: grab;
+  touch-action: none;
+}
+.addon-window__head--static {
+  cursor: default;
+}
+.addon-window.is-dragging {
+  user-select: none;
+}
+.addon-window.is-dragging .addon-window__head {
+  cursor: grabbing;
+}
+.addon-window__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.addon-window__close {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--icon);
+  transition: background 0.12s var(--ease), color 0.12s var(--ease);
+}
+.addon-window__close:hover {
+  background: var(--surface-hover);
+  color: var(--icon-hover);
+}
+.addon-window__body {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 12px;
+}
+.addon-window__resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  background: linear-gradient(
+    135deg,
+    transparent 0 50%,
+    var(--border-strong) 50% 60%,
+    transparent 60% 72%,
+    var(--border-strong) 72% 82%,
+    transparent 82%
+  );
+}
+
+/* ------------------------------------------------------------
+   Kit de widgets pour fenêtres d'addon (« aw- »)
+   Classes génériques et thémées qu'un addon peut réutiliser pour
+   composer une interface cohérente avec le reste de l'app.
+   ------------------------------------------------------------ */
+.aw-display {
+  width: 100%;
+  min-height: 30px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-input);
+  border: 1px solid var(--border);
+  color: var(--text-bright);
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aw-display__expr {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  min-height: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.aw-display__value {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.aw-grid {
+  display: grid;
+  gap: 6px;
+}
+.aw-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 11px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-input);
+  border: 1px solid var(--border);
+  color: var(--text-bright);
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.12s var(--ease), border-color 0.12s var(--ease),
+    color 0.12s var(--ease);
+}
+.aw-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+.aw-btn:active {
+  background: var(--surface-active);
+}
+.aw-btn--fn {
+  background: var(--bg-panel-2);
+  color: var(--text);
+  font-size: 12px;
+}
+.aw-btn--fn:hover {
+  color: var(--text-bright);
+}
+.aw-btn--accent {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #111;
+  font-weight: 600;
+}
+.aw-btn--accent:hover {
+  background: #fff;
+  border-color: #fff;
+}
+.aw-btn--danger {
+  color: var(--danger);
+}
+.aw-btn--danger:hover {
+  border-color: var(--danger);
+}
+.aw-btn[aria-pressed='true'] {
+  background: var(--surface-active);
+  border-color: var(--border-strong);
+  color: var(--text-bright);
+}

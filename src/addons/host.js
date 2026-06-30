@@ -22,7 +22,9 @@
  * être proprement retiré au déchargement / à la désactivation.
  */
 
-const HOST_VERSION = '1.0.0';
+import { AddonWindowManager } from './windows.js';
+
+const HOST_VERSION = '1.1.0';
 const ADDON_EXT_RE = /\.(strokaddon|mjs|js)$/i;
 const EVENTS = ['strokeEnd', 'colorChange', 'toolChange'];
 
@@ -34,6 +36,8 @@ export class AddonHost {
    */
   constructor(bridge) {
     this.bridge = bridge;
+    /** Gestionnaire des fenêtres flottantes ouvertes par les addons. */
+    this.windows = new AddonWindowManager();
     /** @type {Map<string, AddonRecord>} clé = nom de fichier */
     this.records = new Map();
     /** Commandes contribuées, aplaties pour l'UI. */
@@ -122,6 +126,25 @@ export class AddonHost {
         host._rebuildCommands();
         host._notify();
         return dispose;
+      },
+
+      // ---- Contributions UI : fenêtre flottante ----
+      // Ouvre une petite fenêtre interne (déplaçable, thémée, fond optionnel) dont
+      // le contenu (`handle.body`) appartient à l'addon. Les fenêtres ouvertes sont
+      // pistées et fermées automatiquement au déchargement/désactivation de l'addon.
+      createWindow: (winOpts) => {
+        const handle = host.windows.create(winOpts || {});
+        const dispose = () => handle.close();
+        rec.disposables.push(dispose);
+        // Quand l'utilisateur ferme lui-même la fenêtre, on retire le disposable
+        // associé pour ne pas accumuler de fermetures fantômes au fil des ouvertures.
+        const userClose = handle.close;
+        handle.close = () => {
+          const i = rec.disposables.indexOf(dispose);
+          if (i >= 0) rec.disposables.splice(i, 1);
+          userClose();
+        };
+        return handle;
       },
 
       // ---- Événements de l'app ----
