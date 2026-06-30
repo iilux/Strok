@@ -17,7 +17,7 @@ Dark, minimalist UI, 100% custom (no native Windows elements visible).
 npm install      # install dependencies
 npm run dev      # Vite + Electron in dev mode (HMR)
 npm run build    # build React (-> dist/)
-npm run dist     # generate release/Strok-Setup-1.3.1.exe (NSIS)
+npm run dist     # generate release/Strok-Setup-1.4.0.exe (NSIS)
 npm run pack     # unpackaged build (release/win-unpacked/) for quick testing
 npm run icon     # regenerate build/icon.ico
 ```
@@ -55,7 +55,9 @@ npm run icon     # regenerate build/icon.ico
   Closing a **modified tab** prompts to save. See
   [Autosave](#autosave).
 - **Extensions (addons)**: plugin system — users download a
-  `.strokaddon` file and import it via the left rail. See
+  `.strokaddon` file and import it via the left rail. Addons can open
+  **floating, themed, draggable windows** (`createWindow`) to add tool panels
+  that work alongside drawing — e.g. the bundled scientific calculator. See
   [Extensions (addons)](#extensions-addons).
 - **Themes**: change the entire app aesthetic. 5 built-in themes (default,
   Light, Night, Nord, Sepia) + import `.stroktheme` files (JSON) following
@@ -228,6 +230,33 @@ module.activate = function (strok) {
 | Method | Description |
 | --- | --- |
 | `addCommand({ id, label, run })` | Adds a command button. Returns a removal function. |
+| `createWindow(opts)` | Opens a floating, **themed**, draggable window. Returns a handle (see below). |
+
+**Floating windows** — `createWindow(opts)`
+
+A small in-app window the addon fully owns: it follows the active **theme**,
+can be dragged, and can act on the app directly (it has the whole `strok` API in
+scope). Usable **alongside** drawing — perfect for tool panels.
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `title` | `'Addon'` | Title-bar text |
+| `width` / `height` | `320` / auto | Size in px |
+| `x` / `y` | centered | Initial position in px |
+| `draggable` | `true` | Move it by its title bar |
+| `resizable` | `false` | Bottom-right resize handle |
+| `backdrop` | `false` | `false` \| `'dim'` \| `'blur'` — a backdrop behind it (clicking it closes the window; `Esc` also closes) |
+| `closable` | `true` | Show the close button |
+| `className` | — | Extra CSS class for styling |
+| `onClose` | — | Called after the window closes |
+
+Returns a handle: `{ el, body, setTitle, setSize, move, focus, isOpen, close }`.
+Fill `handle.body` with your own DOM. Themed helper classes are available:
+`.aw-btn` (`--fn` / `--accent` / `--danger`), `.aw-display`, `.aw-grid`.
+Open windows are **closed automatically** when the addon is disabled/removed.
+
+> ⚠️ The production CSP forbids inline `onclick=` handlers — wire events with
+> `addEventListener`, not inline attributes.
 
 **Events** (return an unsubscribe function)
 
@@ -253,6 +282,7 @@ module.activate = function (strok) {
 | [`fill-background.strokaddon`](examples/addons/fill-background.strokaddon) | `addCommand`, vector drawing, `commit` |
 | [`invert-colors.strokaddon`](examples/addons/invert-colors.strokaddon) | pixel access `getImageData` / `putImageData` |
 | [`rainbow-stroke.strokaddon`](examples/addons/rainbow-stroke.strokaddon) | events, `storage`, `deactivate` |
+| [`scientific-calculator.strokaddon`](examples/addons/scientific-calculator.strokaddon) | `createWindow`, floating themed UI, `setSize` |
 | [`TEMPLATE.strokaddon`](examples/addons/TEMPLATE.strokaddon) | commented skeleton + full API |
 
 To **distribute** an addon, simply share its `.strokaddon` file.

@@ -1,0 +1,348 @@
+/* =============================================================================
+ * Calculatrice scientifique — addon Strok
+ * =============================================================================
+ *
+ * Démontre `strok.createWindow(...)` : une fenêtre flottante, déplaçable et
+ * thémée (elle suit le thème actif de l'app), utilisable PENDANT que vous
+ * dessinez. Boutons cliquables, fonctions scientifiques (sin, cos, tan, √, ln,
+ * log, puissances, π, e…), et un bouton « → px » qui applique le résultat à la
+ * taille du pinceau — un exemple d'action directe sur l'app depuis une fenêtre.
+ *
+ * Aucune dépendance, aucune étape de build : importez ce .strokaddon, puis
+ * cliquez sur la commande « Calculatrice scientifique » dans le panneau
+ * Extensions (rail de gauche → Extensions).
+ * ========================================================================== */
+
+module.manifest = {
+  id: 'com.strok.scientific-calculator',
+  name: 'Calculatrice scientifique',
+  version: '1.0.0',
+  author: 'Strok',
+  description:
+    'Calculatrice scientifique flottante (sin, cos, tan, √, ln, log, puissances…) utilisable pendant que vous dessinez.',
+};
+
+/* ---------------------------------------------------------------------------
+ * Évaluateur d'expressions (tokeniseur + shunting-yard + RPN).
+ * Aucun eval() : on analyse l'expression nous-mêmes, c'est sûr et prévisible.
+ * ------------------------------------------------------------------------- */
+
+const PREC = { 'u-': 5, '^': 4, '*': 3, '/': 3, '+': 2, '-': 2 };
+const RIGHT = { '^': true, 'u-': true };
+const FUNCS = new Set([
+  'sin', 'cos', 'tan', 'asin', 'acos', 'atan',
+  'sqrt', 'ln', 'log', 'exp', 'abs',
+]);
+
+function tokenize(s) {
+  const out = [];
+  const isDigit = (c) => c >= '0' && c <= '9';
+  const isAlpha = (c) => (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+  let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (c === ' ') { i += 1; continue; }
+    if (c === 'π') { out.push({ t: 'num', v: Math.PI }); i += 1; continue; }
+    if (isDigit(c) || c === '.') {
+      let j = i + 1;
+      while (j < s.length && (isDigit(s[j]) || s[j] === '.')) j += 1;
+      out.push({ t: 'num', v: parseFloat(s.slice(i, j)) });
+      i = j;
+      continue;
+    }
+    if (isAlpha(c)) {
+      let j = i + 1;
+      while (j < s.length && isAlpha(s[j])) j += 1;
+      const name = s.slice(i, j).toLowerCase();
+      i = j;
+      if (name === 'pi') out.push({ t: 'num', v: Math.PI });
+      else if (name === 'e') out.push({ t: 'num', v: Math.E });
+      else if (FUNCS.has(name)) out.push({ t: 'func', v: name });
+      else throw new Error('Inconnu : ' + name);
+      continue;
+    }
+    if ('+-*/^()'.indexOf(c) >= 0) { out.push({ t: 'op', v: c }); i += 1; continue; }
+    throw new Error('Caractère invalide : ' + c);
+  }
+  return out;
+}
+
+function toRPN(tokens) {
+  const out = [];
+  const ops = [];
+  let prev = null;
+  for (const tok of tokens) {
+    if (tok.t === 'num') {
+      out.push(tok);
+    } else if (tok.t === 'func') {
+      ops.push(tok);
+    } else if (tok.v === '(') {
+      ops.push(tok);
+    } else if (tok.v === ')') {
+      while (ops.length && ops[ops.length - 1].v !== '(') out.push(ops.pop());
+      if (!ops.length) throw new Error('Parenthèse fermante en trop');
+      ops.pop(); // retire le '('
+      if (ops.length && ops[ops.length - 1].t === 'func') out.push(ops.pop());
+    } else {
+      // Opérateur. Détecte le moins/plus unaire (début, ou après un opérateur/'(').
+      let name = tok.v;
+      const unaryCtx = !prev || (prev.t === 'op' && prev.v !== ')');
+      if ((name === '-' || name === '+') && unaryCtx) {
+        if (name === '+') { prev = tok; continue; } // plus unaire = sans effet
+        name = 'u-';
+      }
+      while (ops.length) {
+        const top = ops[ops.length - 1];
+        if (top.t !== 'op' || top.v === '(') break;
+        if (PREC[top.v] > PREC[name] || (PREC[top.v] === PREC[name] && !RIGHT[name]))
+          out.push(ops.pop());
+        else break;
+      }
+      ops.push({ t: 'op', v: name });
+    }
+    prev = tok;
+  }
+  while (ops.length) {
+    const top = ops.pop();
+    if (top.v === '(') throw new Error('Parenthèses déséquilibrées');
+    out.push(top);
+  }
+  return out;
+}
+
+function evalRPN(rpn, deg) {
+  const st = [];
+  const toRad = (x) => (deg ? (x * Math.PI) / 180 : x);
+  const fromRad = (x) => (deg ? (x * 180) / Math.PI : x);
+  for (const tok of rpn) {
+    if (tok.t === 'num') { st.push(tok.v); continue; }
+    if (tok.t === 'op') {
+      if (tok.v === 'u-') { st.push(-st.pop()); continue; }
+      const b = st.pop();
+      const a = st.pop();
+      if (a === undefined || b === undefined) throw new Error('Expression incomplète');
+      if (tok.v === '+') st.push(a + b);
+      else if (tok.v === '-') st.push(a - b);
+      else if (tok.v === '*') st.push(a * b);
+      else if (tok.v === '/') st.push(a / b);
+      else if (tok.v === '^') st.push(Math.pow(a, b));
+      continue;
+    }
+    // fonction (un seul argument)
+    const x = st.pop();
+    if (x === undefined) throw new Error('Argument manquant');
+    if (tok.v === 'sin') st.push(Math.sin(toRad(x)));
+    else if (tok.v === 'cos') st.push(Math.cos(toRad(x)));
+    else if (tok.v === 'tan') st.push(Math.tan(toRad(x)));
+    else if (tok.v === 'asin') st.push(fromRad(Math.asin(x)));
+    else if (tok.v === 'acos') st.push(fromRad(Math.acos(x)));
+    else if (tok.v === 'atan') st.push(fromRad(Math.atan(x)));
+    else if (tok.v === 'sqrt') st.push(Math.sqrt(x));
+    else if (tok.v === 'ln') st.push(Math.log(x));
+    else if (tok.v === 'log') st.push(Math.log10(x));
+    else if (tok.v === 'exp') st.push(Math.exp(x));
+    else if (tok.v === 'abs') st.push(Math.abs(x));
+  }
+  if (st.length !== 1) throw new Error('Expression invalide');
+  return st[0];
+}
+
+function evaluate(expr, deg) {
+  return evalRPN(toRPN(tokenize(expr)), deg);
+}
+
+// Formate un nombre proprement (12 chiffres significatifs, sans zéros parasites).
+function fmt(v) {
+  if (Number.isNaN(v)) return 'Erreur';
+  if (!Number.isFinite(v)) return v > 0 ? '∞' : '−∞';
+  if (Object.is(v, -0)) v = 0;
+  return String(Number(v.toPrecision(12)));
+}
+
+// Embellit l'expression brute (ASCII) pour l'affichage.
+function prettify(expr) {
+  return expr
+    .replace(/\*/g, '×')
+    .replace(/\//g, '÷')
+    .replace(/sqrt\(/g, '√(')
+    .replace(/-/g, '−');
+}
+
+/* ---------------------------------------------------------------------------
+ * Disposition du clavier : [label, type, valeur, classe?, span?]
+ *   type 'ins' -> insère `valeur` dans l'expression ; 'act' -> action nommée.
+ * ------------------------------------------------------------------------- */
+const KEYS = [
+  ['DEG', 'act', 'mode', 'aw-btn--fn'],
+  ['sin', 'ins', 'sin(', 'aw-btn--fn'],
+  ['cos', 'ins', 'cos(', 'aw-btn--fn'],
+  ['tan', 'ins', 'tan(', 'aw-btn--fn'],
+  ['√', 'ins', 'sqrt(', 'aw-btn--fn'],
+
+  ['ln', 'ins', 'ln(', 'aw-btn--fn'],
+  ['log', 'ins', 'log(', 'aw-btn--fn'],
+  ['x²', 'ins', '^2', 'aw-btn--fn'],
+  ['xⁿ', 'ins', '^', 'aw-btn--fn'],
+  ['1/x', 'ins', '1/(', 'aw-btn--fn'],
+
+  ['(', 'ins', '(', 'aw-btn--fn'],
+  [')', 'ins', ')', 'aw-btn--fn'],
+  ['π', 'ins', 'π', 'aw-btn--fn'],
+  ['e', 'ins', 'e', 'aw-btn--fn'],
+  ['⌫', 'act', 'back', 'aw-btn--fn'],
+
+  ['7', 'ins', '7'],
+  ['8', 'ins', '8'],
+  ['9', 'ins', '9'],
+  ['÷', 'ins', '/'],
+  ['C', 'act', 'clear', 'aw-btn--danger'],
+
+  ['4', 'ins', '4'],
+  ['5', 'ins', '5'],
+  ['6', 'ins', '6'],
+  ['×', 'ins', '*'],
+  ['→ px', 'act', 'tosize', 'aw-btn--fn'],
+
+  ['1', 'ins', '1'],
+  ['2', 'ins', '2'],
+  ['3', 'ins', '3'],
+  ['−', 'ins', '-'],
+  ['+', 'ins', '+'],
+
+  ['0', 'ins', '0'],
+  ['.', 'ins', '.'],
+  ['Ans', 'act', 'ans'],
+  ['=', 'act', 'eq', 'aw-btn--accent', 2],
+];
+
+function buttonsHTML() {
+  return KEYS.map(([label, type, val, cls, span]) => {
+    const attr = type === 'ins' ? `data-ins="${val}"` : `data-act="${val}"`;
+    const style = span ? ` style="grid-column:span ${span}"` : '';
+    return `<button class="aw-btn${cls ? ' ' + cls : ''}"${style} ${attr}>${label}</button>`;
+  }).join('');
+}
+
+/* ---------------------------------------------------------------------------
+ * Construit et câble la fenêtre de la calculatrice.
+ * ------------------------------------------------------------------------- */
+function openCalculator(strok) {
+  const win = strok.createWindow({
+    title: 'Calculatrice',
+    width: 300,
+    draggable: true,
+  });
+
+  win.body.innerHTML =
+    '<div class="aw-display">' +
+    '<div class="aw-display__expr" data-expr> </div>' +
+    '<div class="aw-display__value" data-value>0</div>' +
+    '</div>' +
+    '<div class="aw-grid" style="grid-template-columns:repeat(5,1fr)">' +
+    buttonsHTML() +
+    '</div>';
+
+  const exprEl = win.body.querySelector('[data-expr]');
+  const valueEl = win.body.querySelector('[data-value]');
+  const modeBtn = win.body.querySelector('[data-act="mode"]');
+
+  // État de la calculatrice.
+  let expr = '';
+  let deg = true; // DEG par défaut (RAD au besoin)
+  let last = 0; // dernier résultat validé (touche « Ans »)
+  let lastValid = 0; // dernier aperçu valide affiché
+  let justEvaluated = false; // après « = », un chiffre repart à zéro
+
+  const refresh = () => {
+    exprEl.textContent = prettify(expr) || ' ';
+    if (!expr.trim()) {
+      valueEl.textContent = '0';
+      lastValid = 0;
+      return;
+    }
+    try {
+      const v = evaluate(expr, deg);
+      if (Number.isFinite(v)) {
+        valueEl.textContent = fmt(v);
+        lastValid = v;
+      }
+    } catch {
+      /* expression incomplète : on garde le dernier aperçu valide */
+    }
+  };
+
+  const insert = (text) => {
+    if (justEvaluated) {
+      // Un nombre/fonction/constante démarre un nouveau calcul ; un opérateur
+      // enchaîne sur le résultat précédent.
+      if (/^[0-9.πe(a-z]/.test(text)) expr = '';
+      justEvaluated = false;
+    }
+    expr += text;
+    refresh();
+  };
+
+  const equals = () => {
+    if (!expr.trim()) return;
+    try {
+      const v = evaluate(expr, deg);
+      if (!Number.isFinite(v)) throw new Error('non fini');
+      last = v;
+      expr = fmt(v);
+      justEvaluated = true;
+      refresh();
+    } catch {
+      strok.notify('Expression invalide', 'error');
+    }
+  };
+
+  const actions = {
+    clear: () => { expr = ''; justEvaluated = false; refresh(); },
+    back: () => { expr = expr.slice(0, -1); refresh(); },
+    ans: () => insert(fmt(last)),
+    eq: equals,
+    mode: () => {
+      deg = !deg;
+      modeBtn.textContent = deg ? 'DEG' : 'RAD';
+      modeBtn.setAttribute('aria-pressed', String(!deg));
+      refresh();
+    },
+    tosize: () => {
+      const n = Math.max(1, Math.min(100, Math.round(lastValid)));
+      strok.setSize(n);
+      strok.notify(`Taille du pinceau : ${n} px`, 'success');
+    },
+  };
+
+  // Un seul écouteur (délégation) pour tout le pavé.
+  win.body.querySelector('.aw-grid').addEventListener('click', (e) => {
+    const btn = e.target.closest('.aw-btn');
+    if (!btn) return;
+    if (btn.dataset.ins != null) insert(btn.dataset.ins);
+    else if (btn.dataset.act) actions[btn.dataset.act]?.();
+  });
+
+  return win;
+}
+
+module.activate = function (strok) {
+  let win = null;
+
+  strok.addCommand({
+    id: 'open',
+    label: 'Calculatrice scientifique',
+    run: () => {
+      if (win && win.isOpen()) {
+        win.focus(); // déjà ouverte -> on la ramène au premier plan
+        return;
+      }
+      win = openCalculator(strok);
+    },
+  });
+
+  return {
+    deactivate: () => {
+      win?.close();
+    },
+  };
+};

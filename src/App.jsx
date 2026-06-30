@@ -14,7 +14,7 @@ import useThemes from './themes/useThemes.js';
 const INK_LIGHT = '#111111'; // crayon par défaut sur papier clair
 const INK_DARK = '#d4d4d4'; // crayon coordonné sur papier sombre
 
-const APP_VERSION = '1.3.1';
+const APP_VERSION = '1.4.0';
 const PROJECT_VERSION = 1;
 const SESSION_VERSION = 1;
 const AUTOSAVE_DELAY = 2000; // ms après la dernière modif avant l'autosave anti-crash
@@ -105,7 +105,7 @@ function StatusBar({ tabName, zoom, tool, size, opacity, color }) {
       <div className="statusbar__spacer" />
       <div className="statusbar__item">{tabName}</div>
       <div className="statusbar__item">{Math.round(zoom * 100)} %</div>
-      <div className="statusbar__brand">Strok · v1.3.1</div>
+      <div className="statusbar__brand">Strok · v{APP_VERSION}</div>
     </footer>
   );
 }
