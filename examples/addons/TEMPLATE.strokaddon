@@ -35,6 +35,18 @@
  *    strok.addCommand({ id, label, run })   -> bouton dans le panneau Extensions
  *                                              et la modale. Renvoie une fonction
  *                                              de retrait.
+ *    strok.createWindow({ ... })            -> fenêtre flottante thémée (suit le
+ *                                              thème de l'app), déplaçable, avec
+ *                                              fond flouté optionnel. Le contenu
+ *                                              (`win.body`) vous appartient.
+ *      Options : title, width, height, x, y, draggable (déf. true), resizable
+ *                (déf. false), backdrop (false | 'dim' | 'blur'), closable, onClose.
+ *      Renvoie  : { el, body, setTitle, setSize, move, focus, isOpen, close }.
+ *      Classes utiles pour le contenu : .aw-btn (+ --fn / --accent / --danger),
+ *                .aw-display, .aw-grid. La fenêtre se ferme automatiquement quand
+ *                l'addon est désactivé/supprimé.
+ *      ⚠ La CSP interdit les `onclick=` inline : branchez vos écouteurs via
+ *        addEventListener (cf. l'exemple plus bas).
  *
  *  Événements (renvoient une fonction de désabonnement) :
  *    strok.on('strokeEnd',   () => {})       // après chaque trait validé
@@ -70,6 +82,22 @@ module.activate = function (strok) {
     },
   });
 
+  // Exemple de fenêtre flottante (thémée, déplaçable).
+  let win = null;
+  strok.addCommand({
+    id: 'panel',
+    label: 'Ouvrir un panneau',
+    run: () => {
+      if (win && win.isOpen()) return win.focus();
+      win = strok.createWindow({ title: 'Mon panneau', width: 240 });
+      win.body.innerHTML =
+        '<button class="aw-btn aw-btn--accent" data-go>Rouge</button>';
+      win.body.querySelector('[data-go]').addEventListener('click', () => {
+        strok.setColor('#e5484d');
+      });
+    },
+  });
+
   // Exemple d'écouteur d'événement.
   const off = strok.on('strokeEnd', () => {
     // ... réagir à la fin d'un trait ...
@@ -78,6 +106,7 @@ module.activate = function (strok) {
   return {
     deactivate: () => {
       off(); // se désabonner proprement
+      win?.close(); // fermer la fenêtre si elle est ouverte
     },
   };
 };
