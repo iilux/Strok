@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { memo, useRef } from 'react';
 
 /* Slider entièrement custom (pas d'input range natif). */
 function Slider({ value, min, max, step = 1, onChange }) {
@@ -52,7 +52,7 @@ function Slider({ value, min, max, step = 1, onChange }) {
   );
 }
 
-export default function Toolbar({
+function Toolbar({
   tool,
   size,
   opacity,
@@ -108,3 +108,5 @@ export default function Toolbar({
     </div>
   );
 }
+
+export default memo(Toolbar);

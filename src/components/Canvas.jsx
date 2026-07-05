@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, memo, useEffect, useImperativeHandle, useRef } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import useCanvas from '../hooks/useCanvas.js';
 
@@ -13,6 +13,7 @@ const clampSize = (s) => Math.max(MIN_SIZE, Math.min(MAX_SIZE, s));
 
 function Canvas(
   {
+    id,
     active,
     tool,
     color,
@@ -22,9 +23,9 @@ function Canvas(
     zoom,
     panX,
     panY,
-    onViewChange,
+    onViewChange, // (id, partial) — callback stable fourni par App
     onSizeChange,
-    onStroke,
+    onStroke, // (id) — callback stable fourni par App
     clearSignal,
   },
   ref
@@ -38,11 +39,14 @@ function Canvas(
     undo,
     redo,
     getProject,
+    getProjectAsync,
     loadProject,
     exportImage,
     getMainContext,
     getCanvasInfo,
     commit,
+    getContentVersion,
+    isDrawing,
   } = useCanvas({
     tool,
     color,
@@ -51,7 +55,7 @@ function Canvas(
     zoom,
     panX,
     panY,
-    onStroke,
+    onStroke: () => onStroke(id),
   });
 
   const cursorRef = useRef(null);
@@ -61,6 +65,7 @@ function Canvas(
     ref,
     () => ({
       getProject,
+      getProjectAsync,
       loadProject,
       exportImage,
       clear,
@@ -69,9 +74,12 @@ function Canvas(
       getMainContext,
       getCanvasInfo,
       commit,
+      getContentVersion,
+      isDrawing,
     }),
     [
       getProject,
+      getProjectAsync,
       loadProject,
       exportImage,
       clear,
@@ -80,10 +88,12 @@ function Canvas(
       getMainContext,
       getCanvasInfo,
       commit,
+      getContentVersion,
+      isDrawing,
     ]
   );
 
-  // Refs « live » pour le handler de molette (lié une seule fois).
+  // Refs « live » pour les handlers liés une seule fois (molette, rAF).
   const zoomRef = useRef(zoom);
   const panRef = useRef({ x: panX, y: panY });
   const viewChangeRef = useRef(onViewChange);
@@ -94,6 +104,57 @@ function Canvas(
   viewChangeRef.current = onViewChange;
   sizeRef.current = size;
   sizeChangeRef.current = onSizeChange;
+
+  // --- Coalescence des changements de vue sur un frame ---
+  // Molette et pan peuvent émettre bien plus de 60 événements/s (souris gaming,
+  // tablette) : chaque setState re-rend l'app entière. On accumule donc les
+  // changements et on n'en émet qu'un par frame d'affichage — visuellement
+  // identique (l'écran ne rafraîchit pas plus vite), mais sans re-rendus perdus.
+  const pendingView = useRef(null);
+  const viewRaf = useRef(0);
+  const queueViewChange = (partial) => {
+    pendingView.current = { ...pendingView.current, ...partial };
+    if (viewRaf.current) return;
+    viewRaf.current = requestAnimationFrame(() => {
+      viewRaf.current = 0;
+      const v = pendingView.current;
+      pendingView.current = null;
+      if (v) viewChangeRef.current(id, v);
+    });
+  };
+  // Vue « effective » : l'état courant + les changements en attente d'émission.
+  const currentView = () => {
+    const p = pendingView.current;
+    return {
+      zoom: p?.zoom ?? zoomRef.current,
+      panX: p?.panX ?? panRef.current.x,
+      panY: p?.panY ?? panRef.current.y,
+    };
+  };
+  useEffect(
+    () => () => {
+      if (viewRaf.current) cancelAnimationFrame(viewRaf.current);
+    },
+    []
+  );
+
+  // --- Cache du bounding rect du stage ---
+  // getBoundingClientRect force un reflow ; le rect du stage ne change qu'au
+  // resize de la fenêtre, inutile de le recalculer à chaque pointermove.
+  const stageRectRef = useRef(null);
+  const getStageRect = () => {
+    if (!stageRectRef.current) {
+      stageRectRef.current = wrapRef.current?.getBoundingClientRect() ?? null;
+    }
+    return stageRectRef.current;
+  };
+  useEffect(() => {
+    const invalidate = () => {
+      stageRectRef.current = null;
+    };
+    window.addEventListener('resize', invalidate);
+    return () => window.removeEventListener('resize', invalidate);
+  }, []);
 
   // Effacement réservé à l'onglet actif.
   useEffect(() => {
@@ -120,16 +181,17 @@ function Canvas(
         return;
       }
 
-      // Molette simple : zoom centré sur le curseur.
-      const z1 = zoomRef.current;
-      const { x: px, y: py } = panRef.current;
-      const rect = stage.getBoundingClientRect();
+      // Molette simple : zoom centré sur le curseur. On part de la vue
+      // effective (changements en attente inclus) pour ne perdre aucun cran.
+      const { zoom: z1, panX: px, panY: py } = currentView();
+      const rect = getStageRect();
+      if (!rect) return;
       const cx = e.clientX - rect.left;
       const cy = e.clientY - rect.top;
       const z2 = clampZoom(z1 * Math.exp(-e.deltaY * 0.0015));
       if (z2 === z1) return;
       const k = z2 / z1;
-      viewChangeRef.current({
+      queueViewChange({
         zoom: z2,
         panX: cx - (cx - px) * k,
         panY: cy - (cy - py) * k,
@@ -138,6 +200,7 @@ function Canvas(
 
     stage.addEventListener('wheel', onWheel, { passive: false });
     return () => stage.removeEventListener('wheel', onWheel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wrapRef]);
 
   // --- Pan par glisser au clic-molette (bouton du milieu) ---
@@ -145,7 +208,8 @@ function Canvas(
   const onStagePointerDownCapture = (e) => {
     if (e.button !== 1) return; // bouton du milieu uniquement
     e.preventDefault();
-    panning.current = { cx: e.clientX, cy: e.clientY, panX, panY };
+    const v = currentView();
+    panning.current = { cx: e.clientX, cy: e.clientY, panX: v.panX, panY: v.panY };
     stageCursor(true);
     try {
       wrapRef.current.setPointerCapture(e.pointerId);
@@ -174,7 +238,7 @@ function Canvas(
     if (!stage) return;
     if (panning.current) {
       const p = panning.current;
-      onViewChange({
+      queueViewChange({
         panX: p.panX + (e.clientX - p.cx),
         panY: p.panY + (e.clientY - p.cy),
       });
@@ -182,27 +246,30 @@ function Canvas(
     }
     const el = cursorRef.current;
     if (!el) return;
-    const r = stage.getBoundingClientRect();
+    const r = getStageRect();
+    if (!r) return;
     el.style.transform = `translate(${e.clientX - r.left}px, ${
       e.clientY - r.top
     }px)`;
   };
-  const showCursor = () => cursorRef.current && (cursorRef.current.style.opacity = '1');
+  const showCursor = () => {
+    stageRectRef.current = null; // la fenêtre a pu bouger : rafraîchit le cache
+    if (cursorRef.current) cursorRef.current.style.opacity = '1';
+  };
   const hideCursor = () => cursorRef.current && (cursorRef.current.style.opacity = '0');
 
   // Zoom via boutons : autour du centre de la vue.
   const zoomBy = (factor) => {
-    const stage = wrapRef.current;
-    if (!stage) return;
-    const rect = stage.getBoundingClientRect();
+    const rect = getStageRect();
+    if (!rect) return;
     const cx = rect.width / 2;
     const cy = rect.height / 2;
     const z2 = clampZoom(zoom * factor);
     if (z2 === zoom) return;
     const k = z2 / zoom;
-    onViewChange({ zoom: z2, panX: cx - (cx - panX) * k, panY: cy - (cy - panY) * k });
+    onViewChange(id, { zoom: z2, panX: cx - (cx - panX) * k, panY: cy - (cy - panY) * k });
   };
-  const resetView = () => onViewChange({ zoom: 1, panX: 0, panY: 0 });
+  const resetView = () => onViewChange(id, { zoom: 1, panX: 0, panY: 0 });
 
   const ringSize = size * zoom;
 
@@ -263,4 +330,4 @@ function Canvas(
   );
 }
 
-export default forwardRef(Canvas);
+export default memo(forwardRef(Canvas));

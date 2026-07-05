@@ -17,7 +17,7 @@ Dark, minimalist UI, 100% custom (no native Windows elements visible).
 npm install      # install dependencies
 npm run dev      # Vite + Electron in dev mode (HMR)
 npm run build    # build React (-> dist/)
-npm run dist     # generate release/Strok-Setup-1.4.0.exe (NSIS)
+npm run dist     # generate release/Strok-Setup-1.4.1.exe (NSIS)
 npm run pack     # unpackaged build (release/win-unpacked/) for quick testing
 npm run icon     # regenerate build/icon.ico
 ```

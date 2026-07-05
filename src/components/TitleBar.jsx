@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Plus, X, HelpCircle } from 'lucide-react';
 
 function Logo() {
@@ -23,7 +23,7 @@ function Logo() {
 
 const api = typeof window !== 'undefined' ? window.strok : undefined;
 
-export default function TitleBar({
+function TitleBar({
   tabs,
   activeTabId,
   onSelectTab,
@@ -136,3 +136,5 @@ export default function TitleBar({
     </div>
   );
 }
+
+export default memo(TitleBar);
