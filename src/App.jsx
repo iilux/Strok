@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import TitleBar from './components/TitleBar.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import Toolbar from './components/Toolbar.jsx';
@@ -14,7 +14,7 @@ import useThemes from './themes/useThemes.js';
 const INK_LIGHT = '#111111'; // crayon par défaut sur papier clair
 const INK_DARK = '#d4d4d4'; // crayon coordonné sur papier sombre
 
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 const PROJECT_VERSION = 1;
 const SESSION_VERSION = 1;
 const AUTOSAVE_DELAY = 2000; // ms après la dernière modif avant l'autosave anti-crash
@@ -66,7 +66,7 @@ function pickFileText(accept) {
 
 let toastSeq = 0;
 
-function Toasts({ toasts }) {
+const Toasts = memo(function Toasts({ toasts }) {
   return (
     <div className="toasts">
       {toasts.map((t) => (
@@ -76,7 +76,7 @@ function Toasts({ toasts }) {
       ))}
     </div>
   );
-}
+});
 
 let tabSeq = 0;
 function makeTab() {
@@ -92,7 +92,7 @@ function makeTab() {
   };
 }
 
-function StatusBar({ tabName, zoom, tool, size, opacity, color }) {
+const StatusBar = memo(function StatusBar({ tabName, zoom, tool, size, opacity, color }) {
   return (
     <footer className="statusbar">
       <div className="statusbar__item">
@@ -108,7 +108,7 @@ function StatusBar({ tabName, zoom, tool, size, opacity, color }) {
       <div className="statusbar__brand">Strok · v{APP_VERSION}</div>
     </footer>
   );
-}
+});
 
 export default function App() {
   const [tool, setTool] = useState('pencil');
@@ -411,6 +411,37 @@ export default function App() {
     [runCommand, markDirty]
   );
 
+  // Fin de trait sur un calque : notifie les addons + marque l'onglet modifié.
+  // Stable pour que <Canvas> (mémoïsé) ne se re-rende pas inutilement.
+  const handleStroke = useCallback(
+    (id) => {
+      emitAddon('strokeEnd');
+      markDirty(id);
+    },
+    [emitAddon, markDirty]
+  );
+
+  // Callbacks de ref stables par onglet (une ref inline casserait la mémoïsation).
+  const tabRefFns = useRef(new Map());
+  const refFnFor = (id) => {
+    let fn = tabRefFns.current.get(id);
+    if (!fn) {
+      fn = (h) => {
+        if (h) canvasRefs.current.set(id, h);
+        else {
+          canvasRefs.current.delete(id);
+          tabRefFns.current.delete(id);
+        }
+      };
+      tabRefFns.current.set(id, fn);
+    }
+    return fn;
+  };
+
+  const openAddons = useCallback(() => setAddonsOpen(true), []);
+  const openThemes = useCallback(() => setThemesOpen(true), []);
+  const openHelp = useCallback(() => setHelpOpen(true), []);
+
   // Maintient les refs « live » à jour à chaque rendu (pont addon + session).
   sessionRef.current = { tabs, activeTabId, darkCanvas };
   liveRef.current = { color, tool, size, opacity, activeTabId };
@@ -432,27 +463,43 @@ export default function App() {
   }, [tool, emitAddon]);
 
   // --- Sérialisation / restauration de session (sauvegarde auto) ---
+  // Cache par onglet du dernier bitmap sérialisé, indexé par version de contenu :
+  // seuls les calques réellement modifiés depuis la dernière sauvegarde sont
+  // ré-encodés (l'encodage PNG d'un grand calque est coûteux).
+  const sessionCache = useRef(new Map()); // id -> { version, doc, image }
+
   // Sérialise tout l'espace de travail (onglets + dessins + vue + onglet actif).
-  // Tous les <Canvas> étant montés, `getProject()` lit leur backing-store même
-  // s'ils sont cachés ; un onglet jamais initialisé (doc.w == 0) est stocké sans image.
-  const serializeSession = useCallback(() => {
+  // Tous les <Canvas> étant montés, la lecture fonctionne même pour les onglets
+  // cachés ; un onglet jamais initialisé (doc.w == 0) est stocké sans image.
+  // Asynchrone : l'encodage PNG passe par toBlob pour ne pas bloquer l'UI.
+  const serializeSession = useCallback(async () => {
     const { tabs: list, activeTabId: active, darkCanvas: dark } = sessionRef.current;
-    const outTabs = list.map((t) => {
+    const cache = sessionCache.current;
+    const outTabs = [];
+    for (const t of list) {
       let doc = null;
       let image = null;
       const handle = canvasRefs.current.get(t.id);
       if (handle) {
         try {
-          const p = handle.getProject();
-          if (p.doc && p.doc.w > 0) {
-            doc = p.doc;
-            image = p.image;
+          const version = handle.getContentVersion?.() ?? -1;
+          const cached = cache.get(t.id);
+          if (cached && cached.version === version) {
+            doc = cached.doc;
+            image = cached.image;
+          } else {
+            const p = await handle.getProjectAsync();
+            if (p.doc && p.doc.w > 0) {
+              doc = p.doc;
+              image = p.image;
+            }
+            cache.set(t.id, { version, doc, image });
           }
         } catch {
           /* onglet non sérialisable -> on garde ses métadonnées seules */
         }
       }
-      return {
+      outTabs.push({
         id: t.id,
         name: t.name,
         view: { zoom: t.zoom, panX: t.panX, panY: t.panY },
@@ -460,8 +507,13 @@ export default function App() {
         filePath: t.filePath || null,
         doc,
         image,
-      };
-    });
+      });
+    }
+    // Purge le cache des onglets fermés.
+    const ids = new Set(list.map((t) => t.id));
+    for (const id of cache.keys()) {
+      if (!ids.has(id)) cache.delete(id);
+    }
     return JSON.stringify({
       app: 'strok',
       version: SESSION_VERSION,
@@ -472,7 +524,7 @@ export default function App() {
   }, []);
 
   const persistSession = useCallback(async () => {
-    const json = serializeSession();
+    const json = await serializeSession();
     if (api?.saveSession) {
       try {
         await api.saveSession(json);
@@ -574,12 +626,27 @@ export default function App() {
   }, [persistSession]);
 
   // Autosave anti-crash : ~2 s après la dernière modification de contenu.
+  // Si un trait est en cours au moment où le minuteur sonne, on repousse la
+  // sauvegarde : jamais d'encodage pendant que l'utilisateur dessine.
   useEffect(() => {
     if (autosaveTick === 0) return; // aucune modif à sauver pour l'instant
-    const id = setTimeout(() => {
+    let cancelled = false;
+    let timer;
+    const attempt = () => {
+      if (cancelled) return;
+      for (const h of canvasRefs.current.values()) {
+        if (h.isDrawing?.()) {
+          timer = setTimeout(attempt, AUTOSAVE_DELAY);
+          return;
+        }
+      }
       persistSession();
-    }, AUTOSAVE_DELAY);
-    return () => clearTimeout(id);
+    };
+    timer = setTimeout(attempt, AUTOSAVE_DELAY);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [autosaveTick, persistSession]);
 
   // --- Raccourcis clavier ---
@@ -681,7 +748,7 @@ export default function App() {
         onSelectTab={setActiveTabId}
         onCloseTab={closeTab}
         onNewTab={newTab}
-        onOpenHelp={() => setHelpOpen(true)}
+        onOpenHelp={openHelp}
       />
 
       <div className="workspace">
@@ -694,18 +761,16 @@ export default function App() {
           onSaveProject={handleSaveProject}
           onOpenProject={handleOpenProject}
           onExportImage={handleExportImage}
-          onOpenAddons={() => setAddonsOpen(true)}
-          onOpenThemes={() => setThemesOpen(true)}
+          onOpenAddons={openAddons}
+          onOpenThemes={openThemes}
         />
 
         <div className="stage-host">
           {tabs.map((tab) => (
             <Canvas
               key={tab.id}
-              ref={(h) => {
-                if (h) canvasRefs.current.set(tab.id, h);
-                else canvasRefs.current.delete(tab.id);
-              }}
+              id={tab.id}
+              ref={refFnFor(tab.id)}
               active={tab.id === activeTabId}
               tool={tool}
               color={color}
@@ -715,12 +780,9 @@ export default function App() {
               zoom={tab.zoom}
               panX={tab.panX}
               panY={tab.panY}
-              onViewChange={(v) => setTabView(tab.id, v)}
+              onViewChange={setTabView}
               onSizeChange={setSize}
-              onStroke={() => {
-                emitAddon('strokeEnd');
-                markDirty(tab.id);
-              }}
+              onStroke={handleStroke}
               clearSignal={clearSignal}
             />
           ))}

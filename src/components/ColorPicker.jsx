@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 
 /* ---- Conversions couleur ---- */
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
@@ -58,7 +58,7 @@ const PRESETS = [
   '#5856d6', '#af52de', '#ff2d55', '#a2845e',
 ];
 
-export default function ColorPicker({
+function ColorPicker({
   color,
   recentColors,
   onColorChange,
@@ -246,3 +246,5 @@ export default function ColorPicker({
     </div>
   );
 }
+
+export default memo(ColorPicker);

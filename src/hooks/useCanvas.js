@@ -28,9 +28,9 @@ import { useCallback, useEffect, useRef } from 'react';
 // pour éviter de réallouer le document à chaque trait quand on reste au même endroit.
 const GROW_MARGIN = 600;
 
-// Profondeur de l'historique undo/redo. Chaque étape conserve une copie bitmap
-// du calque `main` + sa géométrie `docRect` (la toile infinie change de taille,
-// on ne peut donc PAS se contenter d'un ImageData posé en (0,0)).
+// Profondeur de l'historique undo/redo. Chaque étape ne conserve QUE la zone
+// touchée par le trait (avant/après), pas tout le calque : la mémoire dépend
+// de la taille des traits, pas de la taille du document.
 const HISTORY_LIMIT = 40;
 
 export default function useCanvas({
@@ -55,9 +55,23 @@ export default function useCanvas({
   // origine (x, y) + taille (w, h) ; dpr = densité au moment de l'allocation.
   const docRect = useRef({ x: 0, y: 0, w: 0, h: 0, dpr: 1 });
 
-  // Historique undo/redo (par instance de canvas, donc par onglet).
-  // stack : [{ rect:{x,y,w,h,dpr}, snap:<canvas offscreen> }, ...]
+  // Historique undo/redo par CHANGEMENTS (et non par états complets) :
+  // stack : [{ rect:{x,y,w,h,dpr}, x, y, before:<canvas>, after:<canvas> }, ...]
+  // `x, y` en px physiques du buffer au moment du changement ; `before/after`
+  // sont des patchs de la seule zone modifiée. index = dernier changement
+  // appliqué (-1 = état initial).
   const history = useRef({ stack: [], index: -1 });
+
+  // Copie « miroir » de l'état validé de `main` : sert à capturer les pixels
+  // d'AVANT un trait sans avoir à snapshotter tout le calque à chaque étape.
+  const shadowRef = useRef(null);
+
+  // Compteur de versions du contenu : permet aux consommateurs (autosave) de
+  // savoir si le calque a changé sans re-sérialiser.
+  const versionRef = useRef(0);
+  const bumpVersion = () => {
+    versionRef.current += 1;
+  };
 
   const drawing = useRef(false);
   const rect = useRef(null); // bounding rect ÉCRAN de l'overlay (capturé au pointerdown)
@@ -77,6 +91,20 @@ export default function useCanvas({
       c.style.width = `${w}px`;
       c.style.height = `${h}px`;
     }
+  };
+
+  // Réaligne le canvas miroir sur `main` (taille + pixels).
+  const syncShadow = () => {
+    const main = mainRef.current;
+    if (!main) return;
+    let s = shadowRef.current;
+    if (!s) {
+      s = document.createElement('canvas');
+      shadowRef.current = s;
+    }
+    s.width = main.width; // resize => buffer vierge
+    s.height = main.height;
+    if (main.width && main.height) s.getContext('2d').drawImage(main, 0, 0);
   };
 
   // (Ré)alloue le document à `target` (rect monde), en préservant les pixels de main.
@@ -117,6 +145,9 @@ export default function useCanvas({
     }
 
     docRect.current = { x: target.x, y: target.y, w: target.w, h: target.h, dpr };
+    // allocDoc n'est jamais appelé en cours de trait : `main` est à l'état
+    // validé, le miroir peut donc être resynchronisé directement dessus.
+    syncShadow();
     applyDocLayout();
   };
 
@@ -130,9 +161,6 @@ export default function useCanvas({
     const h = stage.clientHeight;
     if (!w || !h) return;
     allocDoc({ x: 0, y: 0, w, h });
-    // Baseline d'historique : permet d'annuler le tout premier trait (retour
-    // au calque vierge). Posée une seule fois, tant que l'histo est vide.
-    if (history.current.stack.length === 0) pushHistory();
   }, []);
 
   // Garantit que le document couvre `r` (rect monde) ; agrandit au besoin (+marge).
@@ -246,59 +274,68 @@ export default function useCanvas({
     ctx.restore();
   };
 
-  /* ---- Historique undo/redo ---- */
-  // Copie l'état courant de `main` (pixels + géométrie) dans une étape d'histo.
-  const snapshotMain = () => {
+  /* ---- Historique undo/redo (par patchs) ---- */
+  // Copie une région (px physiques) d'un canvas dans un petit canvas neuf.
+  const copyRegion = (src, x, y, w, h) => {
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    c.getContext('2d').drawImage(src, x, y, w, h, 0, 0, w, h);
+    return c;
+  };
+
+  // Enregistre le changement de la région (x, y, w, h) — px physiques du buffer
+  // courant : `before` vient du miroir (état validé précédent), `after` de main.
+  // Met aussi le miroir à jour sur cette région.
+  const pushChange = (x, y, w, h) => {
     const main = mainRef.current;
-    if (!main || !main.width || !main.height) return null;
-    const snap = document.createElement('canvas');
-    snap.width = main.width;
-    snap.height = main.height;
-    snap.getContext('2d').drawImage(main, 0, 0);
-    return { rect: { ...docRect.current }, snap };
+    const shadow = shadowRef.current;
+    if (!main || !shadow || w <= 0 || h <= 0) return;
+
+    const before = copyRegion(shadow, x, y, w, h);
+    const after = copyRegion(main, x, y, w, h);
+
+    const sctx = shadow.getContext('2d');
+    sctx.clearRect(x, y, w, h);
+    sctx.drawImage(main, x, y, w, h, x, y, w, h);
+
+    const hist = history.current;
+    hist.stack = hist.stack.slice(0, hist.index + 1);
+    hist.stack.push({ rect: { ...docRect.current }, x, y, before, after });
+    if (hist.stack.length > HISTORY_LIMIT) hist.stack.shift();
+    hist.index = hist.stack.length - 1;
   };
 
-  // Empile l'état courant ; tronque la branche redo, plafonne la profondeur.
-  const pushHistory = () => {
-    const entry = snapshotMain();
-    if (!entry) return;
-    const h = history.current;
-    h.stack = h.stack.slice(0, h.index + 1);
-    h.stack.push(entry);
-    if (h.stack.length > HISTORY_LIMIT) h.stack.shift();
-    h.index = h.stack.length - 1;
-  };
-
-  // Réinitialise l'historique sur l'état courant (après load / clear).
+  // Réinitialise l'historique (après load / clear) : l'état courant devient la baseline.
   const resetHistory = () => {
     history.current = { stack: [], index: -1 };
-    pushHistory();
   };
 
-  // Restaure une étape : remet la géométrie ET les pixels (la toile infinie
-  // peut avoir changé de dimensions entre deux étapes).
-  const restoreHistory = (entry) => {
+  // Applique le patch `before` (undo) ou `after` (redo) d'un changement, en
+  // translatant ses coordonnées : le document a pu s'agrandir depuis (les
+  // pixels étant préservés lors d'un agrandissement, les patchs restent valides).
+  const applyChange = (entry, useBefore) => {
     const main = mainRef.current;
-    const overlay = overlayRef.current;
-    if (!main || !overlay || !entry) return;
-    const r = entry.rect;
-    docRect.current = { ...r };
-    for (const c of [main, overlay]) {
-      c.width = entry.snap.width;
-      c.height = entry.snap.height;
+    const shadow = shadowRef.current;
+    if (!main || !shadow || !entry) return;
+    const cur = docRect.current;
+    const src = useBefore ? entry.before : entry.after;
+    const curDpr = cur.dpr || 1;
+    const k = curDpr / (entry.rect.dpr || 1); // ≠ 1 seulement si le dpr a changé
+    const dx = Math.round((entry.rect.x - cur.x) * curDpr + entry.x * k);
+    const dy = Math.round((entry.rect.y - cur.y) * curDpr + entry.y * k);
+    const dw = Math.round(src.width * k);
+    const dh = Math.round(src.height * k);
+    for (const c of [main, shadow]) {
       const ctx = c.getContext('2d');
-      ctx.setTransform(r.dpr, 0, 0, r.dpr, 0, 0);
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+      ctx.clearRect(dx, dy, dw, dh);
+      ctx.drawImage(src, dx, dy, dw, dh);
+      ctx.restore();
     }
-    const mctx = main.getContext('2d');
-    mctx.save();
-    mctx.setTransform(1, 0, 0, 1, 0, 0);
-    mctx.clearRect(0, 0, main.width, main.height);
-    mctx.drawImage(entry.snap, 0, 0);
-    mctx.restore();
-    clearOverlay();
-    applyDocLayout();
   };
 
   /* ---- Handlers pointeur ---- */
@@ -365,60 +402,64 @@ export default function useCanvas({
       /* noop */
     }
 
+    // Zone réellement touchée par le trait, en px physiques du buffer, avec une
+    // marge pour l'épaisseur du trait (valable crayon ET gomme).
+    const dpr = docRect.current.dpr || 1;
+    const pad = settings.current.size / 2 + 2;
+    const b = strokeBox.current;
+    let dx = Math.floor((b.minX - pad) * dpr);
+    let dy = Math.floor((b.minY - pad) * dpr);
+    let dw = Math.ceil((b.maxX + pad) * dpr) - dx;
+    let dh = Math.ceil((b.maxY + pad) * dpr) - dy;
+    // Clamp aux bornes du buffer.
+    if (dx < 0) {
+      dw += dx;
+      dx = 0;
+    }
+    if (dy < 0) {
+      dh += dy;
+      dy = 0;
+    }
+    dw = Math.min(main.width - dx, dw);
+    dh = Math.min(main.height - dy, dh);
+
     if (strokeTool.current === 'eraser') {
       const mctx = main.getContext('2d');
       mctx.globalCompositeOperation = 'source-over';
       mctx.globalAlpha = 1;
-    } else {
+    } else if (dw > 0 && dh > 0) {
       // Aplatit l'overlay sur main avec l'opacité voulue (uniforme), en ne
       // copiant que la zone réellement touchée par le trait (commit partiel).
-      const dpr = docRect.current.dpr || 1;
-      const pad = settings.current.size / 2 + 2;
-      const b = strokeBox.current;
-      let dx = Math.floor((b.minX - pad) * dpr);
-      let dy = Math.floor((b.minY - pad) * dpr);
-      let dw = Math.ceil((b.maxX + pad) * dpr) - dx;
-      let dh = Math.ceil((b.maxY + pad) * dpr) - dy;
-      // Clamp aux bornes du buffer.
-      if (dx < 0) {
-        dw += dx;
-        dx = 0;
-      }
-      if (dy < 0) {
-        dh += dy;
-        dy = 0;
-      }
-      dw = Math.min(main.width - dx, dw);
-      dh = Math.min(main.height - dy, dh);
+      const mctx = main.getContext('2d');
+      mctx.save();
+      mctx.setTransform(1, 0, 0, 1, 0, 0);
+      mctx.globalCompositeOperation = 'source-over';
+      mctx.globalAlpha = settings.current.opacity;
+      mctx.drawImage(overlay, dx, dy, dw, dh, dx, dy, dw, dh);
+      mctx.restore();
 
-      if (dw > 0 && dh > 0) {
-        const mctx = main.getContext('2d');
-        mctx.save();
-        mctx.setTransform(1, 0, 0, 1, 0, 0);
-        mctx.globalCompositeOperation = 'source-over';
-        mctx.globalAlpha = settings.current.opacity;
-        mctx.drawImage(overlay, dx, dy, dw, dh, dx, dy, dw, dh);
-        mctx.restore();
-
-        const octx = overlay.getContext('2d');
-        octx.save();
-        octx.setTransform(1, 0, 0, 1, 0, 0);
-        octx.clearRect(dx, dy, dw, dh);
-        octx.restore();
-      }
-      overlay.style.opacity = '1';
+      const octx = overlay.getContext('2d');
+      octx.save();
+      octx.setTransform(1, 0, 0, 1, 0, 0);
+      octx.clearRect(dx, dy, dw, dh);
+      octx.restore();
     }
+    if (strokeTool.current !== 'eraser') overlay.style.opacity = '1';
 
     strokeCtx.current = null;
-    pushHistory(); // le trait validé devient une étape annulable
+    // Le trait validé devient une étape annulable : on n'archive QUE la zone
+    // modifiée (avant/après), pas tout le calque.
+    if (dw > 0 && dh > 0) pushChange(dx, dy, dw, dh);
+    bumpVersion();
     if (onStroke) onStroke();
   };
 
   /* ---- Effacer tout (réinitialise aussi le document à la taille du viewport) ---- */
   const clear = useCallback(() => {
     docRect.current = { x: 0, y: 0, w: 0, h: 0, dpr: 1 };
-    history.current = { stack: [], index: -1 }; // ensureInit reposera la baseline
+    resetHistory();
     ensureInit();
+    bumpVersion();
   }, [ensureInit]);
 
   /* ---- Sérialisation projet (.strok) ---- */
@@ -437,6 +478,44 @@ export default function useCanvas({
       image: main.toDataURL('image/png'),
     };
   }, [ensureInit]);
+
+  // Variante asynchrone pour l'autosave : l'encodage PNG passe par toBlob
+  // (non bloquant pour l'UI) au lieu de toDataURL (synchrone).
+  const getProjectAsync = useCallback(
+    () =>
+      new Promise((resolve) => {
+        ensureInit();
+        const main = mainRef.current;
+        const r = docRect.current;
+        const doc = {
+          x: r.x,
+          y: r.y,
+          w: r.w,
+          h: r.h,
+          dpr: r.dpr || window.devicePixelRatio || 1,
+        };
+        const fallback = () => resolve({ doc, image: main.toDataURL('image/png') });
+        if (!main || typeof main.toBlob !== 'function') {
+          fallback();
+          return;
+        }
+        try {
+          main.toBlob((blob) => {
+            if (!blob) {
+              fallback();
+              return;
+            }
+            const fr = new FileReader();
+            fr.onload = () => resolve({ doc, image: String(fr.result) });
+            fr.onerror = fallback;
+            fr.readAsDataURL(blob);
+          }, 'image/png');
+        } catch {
+          fallback();
+        }
+      }),
+    [ensureInit]
+  );
 
   const loadProject = useCallback(
     ({ doc, image }) =>
@@ -466,7 +545,9 @@ export default function useCanvas({
           mctx.restore();
           clearOverlay();
           applyDocLayout();
+          syncShadow();
           resetHistory(); // l'état chargé devient la nouvelle baseline
+          bumpVersion();
           resolve();
         };
         if (!image) {
@@ -519,24 +600,34 @@ export default function useCanvas({
   }, []);
 
   // Valide une édition faite par un addon directement sur le contexte (undo/redo).
+  // La zone modifiée étant inconnue, l'étape couvre tout le buffer.
   const commit = useCallback(() => {
-    pushHistory();
+    const main = mainRef.current;
+    if (!main || !shadowRef.current) return;
+    pushChange(0, 0, main.width, main.height);
+    bumpVersion();
   }, []);
 
   /* ---- Undo / Redo ---- */
   const undo = useCallback(() => {
     const h = history.current;
-    if (h.index <= 0) return;
+    if (h.index < 0) return;
+    applyChange(h.stack[h.index], true);
     h.index -= 1;
-    restoreHistory(h.stack[h.index]);
+    bumpVersion();
   }, []);
 
   const redo = useCallback(() => {
     const h = history.current;
     if (h.index >= h.stack.length - 1) return;
     h.index += 1;
-    restoreHistory(h.stack[h.index]);
+    applyChange(h.stack[h.index], false);
+    bumpVersion();
   }, []);
+
+  /* ---- État exposé (autosave) ---- */
+  const getContentVersion = useCallback(() => versionRef.current, []);
+  const isDrawing = useCallback(() => drawing.current, []);
 
   const handlers = {
     onPointerDown,
@@ -554,10 +645,13 @@ export default function useCanvas({
     undo,
     redo,
     getProject,
+    getProjectAsync,
     loadProject,
     exportImage,
     getMainContext,
     getCanvasInfo,
     commit,
+    getContentVersion,
+    isDrawing,
   };
 }

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import {
   Pencil,
   Eraser,
@@ -16,7 +17,7 @@ const TOOLS = [
   { id: 'eraser', label: 'Gomme  ·  E', Icon: Eraser },
 ];
 
-export default function Sidebar({
+function Sidebar({
   tool,
   onToolChange,
   onClear,
@@ -108,3 +109,5 @@ export default function Sidebar({
     </nav>
   );
 }
+
+export default memo(Sidebar);
