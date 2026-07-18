@@ -24,6 +24,18 @@ win:
   icon: build/icon.ico
   artifactName: ${productName}-Setup-${version}.${ext}
 
+# macOS : .dmg Apple Silicon, non signé (CSC_IDENTITY_AUTO_DISCOVERY=false dans
+# les scripts npm) — electron-builder applique la signature ad-hoc requise sur
+# arm64. L'.icns est généré automatiquement depuis build/icon.png (1024×1024).
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+  icon: build/icon.png
+  category: public.app-category.graphics-design
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
 nsis:
   oneClick: false
   perMachine: false

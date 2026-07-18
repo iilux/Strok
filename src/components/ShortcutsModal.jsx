@@ -9,6 +9,13 @@ import { Keyboard, X } from 'lucide-react';
  * l'extérieur (sur l'app floutée) ou `Échap`.
  */
 
+// Touche de commande selon l'OS : ⌘ sur macOS, Ctrl ailleurs (les gestionnaires
+// clavier testent déjà `ctrlKey || metaKey`, seul l'affichage change).
+const MOD =
+  typeof window !== 'undefined' && window.strok?.platform === 'darwin'
+    ? '⌘'
+    : 'Ctrl';
+
 // Groupes de raccourcis affichés. Reste aligné avec le tableau du README.
 const GROUPS = [
   {
@@ -22,31 +29,31 @@ const GROUPS = [
   {
     title: 'Édition',
     items: [
-      { keys: ['Ctrl', 'Z'], desc: 'Annuler' },
-      { keys: ['Ctrl', 'Y'], alt: ['Ctrl', 'Maj', 'Z'], desc: 'Rétablir' },
+      { keys: [MOD, 'Z'], desc: 'Annuler' },
+      { keys: [MOD, 'Y'], alt: [MOD, 'Maj', 'Z'], desc: 'Rétablir' },
     ],
   },
   {
     title: 'Fichiers',
     items: [
-      { keys: ['Ctrl', 'S'], desc: 'Enregistrer le projet .strok' },
-      { keys: ['Ctrl', 'O'], desc: 'Ouvrir un projet .strok' },
-      { keys: ['Ctrl', 'Maj', 'E'], desc: 'Exporter en PNG' },
+      { keys: [MOD, 'S'], desc: 'Enregistrer le projet .strok' },
+      { keys: [MOD, 'O'], desc: 'Ouvrir un projet .strok' },
+      { keys: [MOD, 'Maj', 'E'], desc: 'Exporter en PNG' },
     ],
   },
   {
     title: 'Onglets',
     items: [
-      { keys: ['Ctrl', 'T'], desc: 'Nouvel onglet' },
-      { keys: ['Ctrl', 'W'], desc: 'Fermer l’onglet actif' },
+      { keys: [MOD, 'T'], desc: 'Nouvel onglet' },
+      { keys: [MOD, 'W'], desc: 'Fermer l’onglet actif' },
     ],
   },
   {
     title: 'Vue',
     items: [
-      { keys: ['Ctrl', '0'], desc: 'Réinitialiser le zoom' },
+      { keys: [MOD, '0'], desc: 'Réinitialiser le zoom' },
       { keys: ['Molette'], desc: 'Zoomer / dézoomer (vers le curseur)' },
-      { keys: ['Ctrl', 'Molette'], desc: 'Taille du pinceau / gomme' },
+      { keys: [MOD, 'Molette'], desc: 'Taille du pinceau / gomme' },
       { keys: ['Clic-molette'], hold: true, desc: 'Déplacer la toile (pan)' },
     ],
   },

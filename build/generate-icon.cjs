@@ -1,11 +1,13 @@
 /* Génère build/icon.ico (+ icon.png) sans dépendance externe.
    Dessine le logo Strok (vague + papier sombre arrondi) en SDF anti-aliasé,
-   encode un PNG 256x256 RGBA, puis l'embarque dans un conteneur ICO. */
+   encode un PNG RGBA, puis :
+     - icon.ico : PNG 256×256 dans un conteneur ICO (Windows) ;
+     - icon.png : PNG 1024×1024 (electron-builder le convertit en .icns macOS,
+       qui exige au moins 512×512). */
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-const S = 256;
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 
 /* ---- Géométrie ---- */
@@ -42,13 +44,16 @@ function over(dst, sr, sg, sb, sa) {
   return [r, g, b, outA];
 }
 
-function render() {
+// Rendu à la taille S. La géométrie est définie en coordonnées 256 et mise à
+// l'échelle par k ; l'anti-aliasing reste sur ~1 px de la taille cible.
+function render(S) {
+  const k = S / 256;
   const buf = Buffer.alloc(S * S * 4);
   const wave = [
-    [60, 178],
-    [104, 92],
-    [150, 150],
-    [196, 80],
+    [60 * k, 178 * k],
+    [104 * k, 92 * k],
+    [150 * k, 150 * k],
+    [196 * k, 80 * k],
   ];
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
@@ -57,21 +62,21 @@ function render() {
       let p = [0, 0, 0, 0];
 
       // Fond : papier sombre arrondi (#181818)
-      const bgd = roundedRectSDF(px, py, S / 2, S / 2, 120, 120, 52);
+      const bgd = roundedRectSDF(px, py, S / 2, S / 2, 120 * k, 120 * k, 52 * k);
       const bgA = clamp(0.5 - bgd, 0, 1);
       p = over(p, 24 / 255, 24 / 255, 24 / 255, bgA);
 
-      // Légère bordure plus claire pour le relief
-      const ringA = clamp(1 - Math.abs(bgd + 1.5), 0, 1) * 0.5;
+      // Légère bordure plus claire pour le relief (largeur ~2 px à l'échelle)
+      const ringA = clamp(1 - Math.abs(bgd + 1.5 * k) / k, 0, 1) * 0.5;
       p = over(p, 60 / 255, 60 / 255, 60 / 255, ringA * p[3]);
 
       // La vague (trait clair)
       const wd = polyDist(px, py, wave);
-      const strokeA = clamp(0.5 - (wd - 15), 0, 1);
+      const strokeA = clamp(0.5 - (wd - 15 * k), 0, 1);
       p = over(p, 235 / 255, 235 / 255, 235 / 255, strokeA);
 
       // Point de départ (tête de crayon)
-      const dotA = clamp(0.5 - (Math.hypot(px - 60, py - 178) - 7), 0, 1);
+      const dotA = clamp(0.5 - (Math.hypot(px - 60 * k, py - 178 * k) - 7 * k), 0, 1);
       p = over(p, 235 / 255, 235 / 255, 235 / 255, dotA);
 
       const o = (y * S + x) * 4;
@@ -107,7 +112,7 @@ function chunk(type, data) {
   crcBuf.writeUInt32BE(crc32(Buffer.concat([t, data])), 0);
   return Buffer.concat([len, t, data, crcBuf]);
 }
-function encodePNG(rgba) {
+function encodePNG(rgba, S) {
   const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(S, 0);
@@ -147,9 +152,15 @@ function encodeICO(png) {
   return Buffer.concat([header, entry, png]);
 }
 
-const rgba = render();
-const png = encodePNG(rgba);
-const ico = encodeICO(png);
-fs.writeFileSync(path.join(__dirname, 'icon.png'), png);
+// Windows : ICO 256×256 (0 dans l'entrée ICO = 256).
+const png256 = encodePNG(render(256), 256);
+const ico = encodeICO(png256);
 fs.writeFileSync(path.join(__dirname, 'icon.ico'), ico);
-console.log('icon.ico (', ico.length, 'octets) + icon.png générés.');
+
+// macOS/Linux : PNG 1024×1024 (converti en .icns par electron-builder).
+const png1024 = encodePNG(render(1024), 1024);
+fs.writeFileSync(path.join(__dirname, 'icon.png'), png1024);
+
+console.log(
+  'icon.ico (', ico.length, 'octets, 256px) + icon.png (', png1024.length, 'octets, 1024px) générés.'
+);

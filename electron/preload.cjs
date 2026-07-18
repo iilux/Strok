@@ -2,6 +2,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 // API minimale et sûre exposée au renderer (contextIsolation activé).
 contextBridge.exposeInMainWorld('strok', {
+  // 'darwin' | 'win32' | 'linux' — l'UI adapte titlebar et libellés (⌘ vs Ctrl).
+  platform: process.platform,
+
   minimize: () => ipcRenderer.send('window:minimize'),
   maximize: () => ipcRenderer.send('window:maximize'),
   close: () => ipcRenderer.send('window:close'),

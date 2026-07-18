@@ -1,11 +1,12 @@
 # Strok
 
 Desktop drawing / sketching application — **Electron + React (Vite)**.
-Dark, minimalist UI, 100% custom (no native Windows elements visible).
+Dark, minimalist UI, 100% custom. Runs on **Windows** and **macOS**.
 
 ## Stack
 
-- **Electron 33** — frameless window (`frame: false`), custom titlebar.
+- **Electron** — custom titlebar: frameless (`frame: false`) on Windows,
+  native traffic lights (`titleBarStyle: 'hiddenInset'`) on macOS.
 - **React 18 + Vite 6** — UI and bundling.
 - **HTML5 Canvas** — drawing engine (dual main/overlay canvas).
 - **Handwritten CSS** — no Tailwind, no Material UI.
@@ -17,9 +18,11 @@ Dark, minimalist UI, 100% custom (no native Windows elements visible).
 npm install      # install dependencies
 npm run dev      # Vite + Electron in dev mode (HMR)
 npm run build    # build React (-> dist/)
-npm run dist     # generate release/Strok-Setup-1.4.1.exe (NSIS)
-npm run pack     # unpackaged build (release/win-unpacked/) for quick testing
-npm run icon     # regenerate build/icon.ico
+npm run dist     # installer for the current OS:
+                 #   Windows -> release/Strok-Setup-1.5.0.exe (NSIS)
+                 #   macOS   -> release/Strok-1.5.0-arm64.dmg
+npm run pack     # unpackaged build (release/win-unpacked/ or release/mac-arm64/)
+npm run icon     # regenerate build/icon.ico (256px) + build/icon.png (1024px)
 ```
 
 `npm run dev` starts Vite (port 5173) then Electron once the server is ready.
@@ -79,6 +82,9 @@ npm run icon     # regenerate build/icon.ico
 | `scroll wheel` | Zoom in / out (toward cursor) |
 | `Ctrl + scroll wheel` | Brush / eraser size |
 | `middle-click drag` | Pan the canvas |
+
+> 🍎 On **macOS**, use `Cmd (⌘)` instead of `Ctrl` — the in-app cheat sheet
+> adapts automatically.
 
 > 💡 This same list is available **inside the app** via the **?** button in the
 > titlebar — see [Shortcuts cheat sheet](#shortcuts-cheat-sheet).
@@ -444,15 +450,29 @@ Hardening applied on the Electron side and build:
 > the `app.asar` is extractable — hardening **raises the bar**, it does not make
 > the source code tamper-proof.
 
-## Building the `.exe` — important note
+## Building — important notes
+
+`npm run dist` builds the installer **for the OS you run it on**: the NSIS
+`.exe` on Windows, the `.dmg` (Apple Silicon) on macOS.
 
 **Code signing is disabled** in `npm run dist`
-(`CSC_IDENTITY_AUTO_DISCOVERY=false`). This avoids extracting the
-`winCodeSign` package from electron-builder, which fails on Windows without
-the symbolic link creation privilege (Developer Mode disabled / non-admin).
-The generated `.exe` remains **self-contained** (Node + Chromium bundled); it
-will simply be unsigned. To sign later, provide a certificate via
-`CSC_LINK` / `CSC_KEY_PASSWORD`.
+(`CSC_IDENTITY_AUTO_DISCOVERY=false`).
+
+- **Windows**: avoids extracting the `winCodeSign` package from
+  electron-builder, which fails without the symbolic link creation privilege
+  (Developer Mode disabled / non-admin). The generated `.exe` remains
+  **self-contained** (Node + Chromium bundled); it will simply be unsigned.
+  To sign later, provide a certificate via `CSC_LINK` / `CSC_KEY_PASSWORD`.
+- **macOS**: no Apple Developer certificate is required — electron-builder
+  applies the **ad-hoc signature** mandatory on Apple Silicon. Because the
+  `.dmg` is not notarized, people who **download** it will see the Gatekeeper
+  warning: **right-click the app → Open** (once), or run
+  `xattr -cr /Applications/Strok.app` to clear the quarantine attribute.
+  A locally-built app opens without any warning.
+
+On macOS, user data lives in `~/Library/Application Support/Strok/`
+(`strok-session.json`, `strok-addons/`, `strok-themes/`) — the equivalent of
+`…/AppData/Roaming/Strok/` on Windows.
 
 ## To do
 

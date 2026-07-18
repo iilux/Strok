@@ -25,6 +25,7 @@ const fs = require('node:fs/promises');
 // Vite sur 127.0.0.1:5173. En prod (exe empaqueté), on charge le build file://.
 const isDev = !app.isPackaged && process.env.NODE_ENV === 'development';
 const DEV_URL = 'http://127.0.0.1:5173';
+const isMac = process.platform === 'darwin';
 
 // Limites de sécurité sur les payloads IPC (anti-DoS mémoire / fichiers géants).
 const MAX_PROJECT_BYTES = 256 * 1024 * 1024; // 256 Mo de JSON .strok
@@ -51,6 +52,10 @@ let mainWindow = null;
 // session AVANT de quitter (cf. flush-on-close plus bas).
 let sessionFlushed = false;
 let flushTimer = null;
+
+// Cmd+Q (macOS) : le quit passe par notre `close` intercepté, qui l'annule le
+// temps du flush de session. On note l'intention pour relancer app.quit() après.
+let quitRequested = false;
 
 // Chemins .strok que l'utilisateur a explicitement désignés via un dialogue OS
 // (enregistrer/ouvrir) durant CETTE session. Seuls ces chemins sont réinscriptibles
@@ -121,16 +126,25 @@ app.on('web-contents-created', (_event, contents) => hardenContents(contents));
 
 // ───────────────────────── Fenêtre ─────────────────────────
 function createWindow() {
+  // La fenêtre peut être recréée via le Dock (macOS) : le flush de session
+  // redevient nécessaire pour ce nouveau cycle de vie.
+  sessionFlushed = false;
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 900,
     minHeight: 600,
     show: false, // évite le flash blanc : on montre sur 'ready-to-show'
-    frame: false, // titlebar custom (aucun chrome natif Windows)
+    // Titlebar custom : frameless sous Windows/Linux ; sous macOS on garde les
+    // feux tricolores natifs, incrustés dans la titlebar HTML (hiddenInset).
+    ...(isMac
+      ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 12, y: 12 } }
+      : { frame: false }),
     backgroundColor: '#0d0d0d',
     autoHideMenuBar: true,
-    icon: isDev ? undefined : path.join(__dirname, '..', 'build', 'icon.ico'),
+    // macOS : l'icône vient du bundle .app (le paramètre est ignoré/inutile).
+    icon: isDev || isMac ? undefined : path.join(__dirname, '..', 'build', 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       // ── Isolation maximale du renderer ──
@@ -171,11 +185,13 @@ function createWindow() {
     } catch {
       sessionFlushed = true;
       mainWindow.destroy();
+      if (quitRequested) app.quit();
       return;
     }
     flushTimer = setTimeout(() => {
       sessionFlushed = true;
       if (mainWindow) mainWindow.destroy();
+      if (quitRequested) app.quit();
     }, 8000);
   });
 
@@ -206,8 +222,20 @@ if (!app.requestSingleInstanceLock()) {
     }
   });
 
-  // Pas de menu applicatif global (Windows/Linux).
-  Menu.setApplicationMenu(null);
+  // Windows/Linux : aucun menu applicatif. macOS : un menu minimal est
+  // indispensable (Cmd+Q, Cmd+C/V/X/A dans les champs texte passent par les
+  // accélérateurs du menu) — sans menu « View », donc sans raccourci DevTools.
+  Menu.setApplicationMenu(
+    isMac
+      ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }])
+      : null
+  );
+
+  // Note l'intention de quitter (Cmd+Q, dock → Quitter) : notre gestionnaire
+  // `close` annule le quit le temps du flush de session, puis le relance.
+  app.on('before-quit', () => {
+    quitRequested = true;
+  });
 
   app.whenReady().then(() => {
     // Refuse toute demande de permission web (caméra, micro, géoloc, etc.) :
@@ -611,4 +639,5 @@ ipcMain.on('session:flushed', () => {
   }
   sessionFlushed = true;
   if (mainWindow) mainWindow.destroy();
+  if (quitRequested) app.quit();
 });
