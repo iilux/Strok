@@ -134,6 +134,11 @@ button {
   z-index: 50;
 }
 
+/* macOS : dégage la zone des feux tricolores natifs (titleBarStyle hiddenInset). */
+.titlebar--mac {
+  padding-left: 78px;
+}
+
 .titlebar__brand {
   display: flex;
   align-items: center;
@@ -681,7 +686,7 @@ button {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-bright);
-  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-family: 'Cascadia Code', 'Consolas', 'SF Mono', 'Menlo', monospace;
   font-size: 12px;
   padding: 6px 9px;
   outline: none;
@@ -1100,7 +1105,7 @@ button {
 }
 .addon-empty code,
 .addon-row__file code {
-  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-family: 'Cascadia Code', 'Consolas', 'SF Mono', 'Menlo', monospace;
   font-size: 11px;
   background: var(--surface-input);
   padding: 1px 5px;
@@ -1160,7 +1165,7 @@ button {
   margin-top: 6px;
 }
 .addon-row__file {
-  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-family: 'Cascadia Code', 'Consolas', 'SF Mono', 'Menlo', monospace;
   font-size: 10.5px;
   color: var(--text-dim);
   margin-top: 7px;
@@ -1302,7 +1307,7 @@ button {
   border: 1px solid var(--border-strong);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.55);
   color: var(--text-bright);
-  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-family: 'Cascadia Code', 'Consolas', 'SF Mono', 'Menlo', monospace;
   font-size: 11px;
   line-height: 1;
 }
@@ -1627,7 +1632,7 @@ button {
   background: var(--surface-input);
   border: 1px solid var(--border);
   color: var(--text-bright);
-  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-family: 'Cascadia Code', 'Consolas', 'SF Mono', 'Menlo', monospace;
   text-align: right;
   overflow: hidden;
   text-overflow: ellipsis;

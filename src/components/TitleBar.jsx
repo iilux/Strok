@@ -22,6 +22,9 @@ function Logo() {
 }
 
 const api = typeof window !== 'undefined' ? window.strok : undefined;
+// macOS : les feux tricolores natifs (à gauche, hiddenInset) remplacent les
+// boutons custom min/max/fermer.
+const isMac = api?.platform === 'darwin';
 
 function TitleBar({
   tabs,
@@ -34,7 +37,7 @@ function TitleBar({
   const [isMax, setIsMax] = useState(false);
 
   useEffect(() => {
-    if (!api) return;
+    if (!api || isMac) return;
     api.isMaximized().then(setIsMax).catch(() => {});
     return api.onMaximizeChange(setIsMax);
   }, []);
@@ -42,7 +45,7 @@ function TitleBar({
   const showClose = tabs.length > 1;
 
   return (
-    <div className="titlebar">
+    <div className={`titlebar${isMac ? ' titlebar--mac' : ''}`}>
       <div className="titlebar__brand">
         <Logo />
         <span className="titlebar__title">Strok</span>
@@ -96,42 +99,46 @@ function TitleBar({
           <HelpCircle size={15} strokeWidth={1.7} />
         </button>
 
-        <button
-          className="win-btn"
-          onClick={() => api?.minimize()}
-          aria-label="Minimiser"
-        >
-          <svg width="11" height="11" viewBox="0 0 11 11">
-            <rect x="1" y="5" width="9" height="1" fill="currentColor" />
-          </svg>
-        </button>
+        {!isMac && (
+          <>
+            <button
+              className="win-btn"
+              onClick={() => api?.minimize()}
+              aria-label="Minimiser"
+            >
+              <svg width="11" height="11" viewBox="0 0 11 11">
+                <rect x="1" y="5" width="9" height="1" fill="currentColor" />
+              </svg>
+            </button>
 
-        <button
-          className="win-btn"
-          onClick={() => api?.maximize()}
-          aria-label={isMax ? 'Restaurer' : 'Maximiser'}
-        >
-          {isMax ? (
-            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-              <rect x="1.5" y="3" width="6.5" height="6.5" stroke="currentColor" strokeWidth="1" />
-              <path d="M3.5 3V1.5H9.5V7.5H8" stroke="currentColor" strokeWidth="1" />
-            </svg>
-          ) : (
-            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-              <rect x="1.5" y="1.5" width="8" height="8" stroke="currentColor" strokeWidth="1" />
-            </svg>
-          )}
-        </button>
+            <button
+              className="win-btn"
+              onClick={() => api?.maximize()}
+              aria-label={isMax ? 'Restaurer' : 'Maximiser'}
+            >
+              {isMax ? (
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                  <rect x="1.5" y="3" width="6.5" height="6.5" stroke="currentColor" strokeWidth="1" />
+                  <path d="M3.5 3V1.5H9.5V7.5H8" stroke="currentColor" strokeWidth="1" />
+                </svg>
+              ) : (
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                  <rect x="1.5" y="1.5" width="8" height="8" stroke="currentColor" strokeWidth="1" />
+                </svg>
+              )}
+            </button>
 
-        <button
-          className="win-btn win-btn--close"
-          onClick={() => api?.close()}
-          aria-label="Fermer"
-        >
-          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-            <path d="M1.5 1.5L9.5 9.5M9.5 1.5L1.5 9.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
-          </svg>
-        </button>
+            <button
+              className="win-btn win-btn--close"
+              onClick={() => api?.close()}
+              aria-label="Fermer"
+            >
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                <path d="M1.5 1.5L9.5 9.5M9.5 1.5L1.5 9.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+              </svg>
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

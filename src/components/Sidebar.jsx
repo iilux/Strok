@@ -12,6 +12,12 @@ import {
   Palette,
 } from 'lucide-react';
 
+// Touche de commande selon l'OS : ⌘ sur macOS, Ctrl ailleurs.
+const MOD =
+  typeof window !== 'undefined' && window.strok?.platform === 'darwin'
+    ? '⌘'
+    : 'Ctrl';
+
 const TOOLS = [
   { id: 'pencil', label: 'Crayon  ·  B', Icon: Pencil },
   { id: 'eraser', label: 'Gomme  ·  E', Icon: Eraser },
@@ -48,21 +54,21 @@ function Sidebar({
       <div className="rail__group">
         <button
           className="tool-btn tip"
-          data-tip="Ouvrir un projet  ·  Ctrl+O"
+          data-tip={`Ouvrir un projet  ·  ${MOD}+O`}
           onClick={onOpenProject}
         >
           <FolderOpen size={18} strokeWidth={1.6} />
         </button>
         <button
           className="tool-btn tip"
-          data-tip="Enregistrer le projet  ·  Ctrl+S"
+          data-tip={`Enregistrer le projet  ·  ${MOD}+S`}
           onClick={onSaveProject}
         >
           <Save size={18} strokeWidth={1.6} />
         </button>
         <button
           className="tool-btn tip"
-          data-tip="Exporter en PNG  ·  Ctrl+Maj+E"
+          data-tip={`Exporter en PNG  ·  ${MOD}+Maj+E`}
           onClick={onExportImage}
         >
           <Download size={18} strokeWidth={1.6} />
