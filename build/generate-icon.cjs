@@ -157,10 +157,24 @@ const png256 = encodePNG(render(256), 256);
 const ico = encodeICO(png256);
 fs.writeFileSync(path.join(__dirname, 'icon.ico'), ico);
 
-// macOS/Linux : PNG 1024×1024 (converti en .icns par electron-builder).
+// macOS : PNG 1024×1024 (converti en .icns par electron-builder).
 const png1024 = encodePNG(render(1024), 1024);
 fs.writeFileSync(path.join(__dirname, 'icon.png'), png1024);
 
+// Linux : un jeu de tailles dans build/icons/ (cf. electron-builder.yml →
+// linux.icon). Le paquet les installe dans /usr/share/icons/hicolor/<S>x<S>/,
+// et SEULES les tailles listées par le thème hicolor y sont retrouvées par
+// GTK — un unique 1024×1024 ne serait jamais affiché dans le menu Cinnamon.
+const LINUX_SIZES = [16, 24, 32, 48, 64, 128, 256, 512];
+const iconsDir = path.join(__dirname, 'icons');
+fs.mkdirSync(iconsDir, { recursive: true });
+for (const size of LINUX_SIZES) {
+  const png = size === 256 ? png256 : encodePNG(render(size), size);
+  fs.writeFileSync(path.join(iconsDir, `${size}x${size}.png`), png);
+}
+
 console.log(
-  'icon.ico (', ico.length, 'octets, 256px) + icon.png (', png1024.length, 'octets, 1024px) générés.'
+  'icon.ico (256px) + icon.png (1024px) + icons/ (' +
+    LINUX_SIZES.join(', ') +
+    'px) générés.'
 );

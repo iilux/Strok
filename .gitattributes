@@ -1,2 +1,7 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Scripts destinés à s'exécuter sous Linux (post-install du paquet .deb) :
+# toujours en LF, même sur un poste Windows — un CRLF ferait échouer dpkg sur
+# « /bin/bash^M: bad interpreter ».
+*.tpl text eol=lf
