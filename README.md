@@ -1,12 +1,12 @@
 # Strok
 
 Desktop drawing / sketching application — **Electron + React (Vite)**.
-Dark, minimalist UI, 100% custom. Runs on **Windows** and **macOS**.
+Dark, minimalist UI, 100% custom. Runs on **Windows**, **macOS** and **Linux**.
 
 ## Stack
 
-- **Electron** — custom titlebar: frameless (`frame: false`) on Windows,
-  native traffic lights (`titleBarStyle: 'hiddenInset'`) on macOS.
+- **Electron** — custom titlebar: frameless (`frame: false`) on Windows and
+  Linux, native traffic lights (`titleBarStyle: 'hiddenInset'`) on macOS.
 - **React 18 + Vite 6** — UI and bundling.
 - **HTML5 Canvas** — drawing engine (dual main/overlay canvas).
 - **Handwritten CSS** — no Tailwind, no Material UI.
@@ -19,10 +19,14 @@ npm install      # install dependencies
 npm run dev      # Vite + Electron in dev mode (HMR)
 npm run build    # build React (-> dist/)
 npm run dist     # installer for the current OS:
-                 #   Windows -> release/Strok-Setup-1.5.0.exe (NSIS)
-                 #   macOS   -> release/Strok-1.5.0-arm64.dmg
-npm run pack     # unpackaged build (release/win-unpacked/ or release/mac-arm64/)
-npm run icon     # regenerate build/icon.ico (256px) + build/icon.png (1024px)
+                 #   Windows -> release/Strok-Setup-1.6.0.exe (NSIS)
+                 #   macOS   -> release/Strok-1.6.0-arm64.dmg
+                 #   Linux   -> release/strok_1.6.0_amd64.deb
+                 #              release/Strok-1.6.0.AppImage
+npm run pack     # unpackaged build (release/win-unpacked/, mac-arm64/
+                 #   or linux-unpacked/)
+npm run icon     # regenerate build/icon.ico (256px), build/icon.png (1024px)
+                 #   and build/icons/ (16 -> 512px, Linux icon set)
 ```
 
 `npm run dev` starts Vite (port 5173) then Electron once the server is ready.
@@ -421,6 +425,8 @@ Stroke/
 │   └── themes/         # example themes (.stroktheme) + TEMPLATE
 ├── build/
 │   ├── generate-icon.cjs
+│   ├── deb-after-install.tpl   # postinst .deb (SUID chrome-sandbox)
+│   ├── icons/                  # 16 -> 512px PNG set (Linux)
 │   └── icon.ico / icon.png
 ├── index.html
 ├── vite.config.js
@@ -434,7 +440,9 @@ Hardening applied on the Electron side and build:
 
 - **Renderer isolation**: `contextIsolation` + `sandbox` + `nodeIntegration: false`
   — the renderer can only make IPC calls explicitly exposed by
-  `preload.cjs`, no direct access to Node or the system.
+  `preload.cjs`, no direct access to Node or the system. (The OS-level part of
+  that sandbox is off in the Linux **AppImage** only — see
+  [Linux — installing](#linux--installing-mint--ubuntu--debian).)
 - **No network leak**: navigation locked to the app's origin
   (`will-navigate`), new windows refused (`setWindowOpenHandler`), no web
   permission granted, strict `default-src 'self'` CSP in production. (The
@@ -453,7 +461,10 @@ Hardening applied on the Electron side and build:
 ## Building — important notes
 
 `npm run dist` builds the installer **for the OS you run it on**: the NSIS
-`.exe` on Windows, the `.dmg` (Apple Silicon) on macOS.
+`.exe` on Windows, the `.dmg` (Apple Silicon) on macOS, the `.deb` +
+`.AppImage` on Linux. Linux packages **must be built from Linux**: the `.deb`
+needs `fpm` and the AppImage needs symlink creation + `mksquashfs`, neither of
+which electron-builder can run from Windows.
 
 **Code signing is disabled** in `npm run dist`
 (`CSC_IDENTITY_AUTO_DISCOVERY=false`).
@@ -469,10 +480,44 @@ Hardening applied on the Electron side and build:
   warning: **right-click the app → Open** (once), or run
   `xattr -cr /Applications/Strok.app` to clear the quarantine attribute.
   A locally-built app opens without any warning.
+- **Linux**: nothing to sign, `.deb` and `.AppImage` are unsigned by design.
 
-On macOS, user data lives in `~/Library/Application Support/Strok/`
-(`strok-session.json`, `strok-addons/`, `strok-themes/`) — the equivalent of
-`…/AppData/Roaming/Strok/` on Windows.
+### Linux — installing (Mint / Ubuntu / Debian)
+
+The **`.deb` is the recommended format** — and the reference target on Linux
+Mint (Cinnamon):
+
+```bash
+sudo apt install ./strok_1.6.0_amd64.deb   # or double-click the file
+strok                                       # also in the applications menu
+```
+
+It installs into `/opt/Strok`, adds a `strok` command in `/usr/bin`, registers
+the menu entry (`/usr/share/applications/strok.desktop`) and the icon set
+(16 → 512px, in `hicolor`). Its post-install script marks `chrome-sandbox` as
+**SUID root**, so the renderer stays sandboxed: Ubuntu 24.04 and Mint 22
+restrict unprivileged user namespaces
+(`kernel.apparmor_restrict_unprivileged_userns=1`), and without that bit
+Chromium refuses to start at all.
+
+The **`.AppImage`** is the portable fallback for other distributions:
+
+```bash
+chmod +x Strok-1.6.0.AppImage && ./Strok-1.6.0.AppImage
+```
+
+Two caveats compared to the `.deb`:
+
+- it runs with `--no-sandbox` (electron-builder default: an AppImage is mounted
+  `nosuid`, the sandbox helper cannot be SUID inside it) — prefer the `.deb` if
+  you install third-party addons, which run inside the renderer;
+- AppImages need FUSE 2, absent from Mint 21+ / Ubuntu 22.04+ by default:
+  `sudo apt install libfuse2` (`libfuse2t64` on Mint 22), or run it once with
+  `./Strok-1.6.0.AppImage --appimage-extract-and-run`.
+
+User data lives in `~/.config/Strok/` (`strok-session.json`, `strok-addons/`,
+`strok-themes/`) — the equivalent of `~/Library/Application Support/Strok/` on
+macOS and `…/AppData/Roaming/Strok/` on Windows.
 
 ## To do
 

@@ -26,6 +26,25 @@ const fs = require('node:fs/promises');
 const isDev = !app.isPackaged && process.env.NODE_ENV === 'development';
 const DEV_URL = 'http://127.0.0.1:5173';
 const isMac = process.platform === 'darwin';
+const isLinux = process.platform === 'linux';
+
+// ── Identité de l'app sous Linux ──
+// Windows et macOS déduisent le nom de l'app des métadonnées du binaire / du
+// bundle (« Strok ») ; Linux n'en a aucune et retombe sur le champ `name` de
+// package.json (« strok », minuscule). On le fixe explicitement, AVANT tout
+// accès à userData (le verrou d'instance unique plus bas en dépend), pour que :
+//   • les données utilisateur vivent dans ~/.config/Strok, comme sur les autres
+//     systèmes (~/Library/Application Support/Strok, AppData/Roaming/Strok) ;
+//   • le WM_CLASS de la fenêtre soit « Strok », valeur déclarée en
+//     StartupWMClass dans le .desktop → la barre des tâches et Alt+Tab
+//     retrouvent l'icône et le nom de l'app au lieu de ceux d'Electron.
+if (isLinux) {
+  app.setName('Strok');
+  // Session Wayland : l'app_id doit correspondre au .desktop installé. API
+  // Linux-only et historique — testée avant appel pour qu'une future version
+  // d'Electron qui la retirerait ne fasse pas planter l'app au démarrage.
+  if (typeof app.setDesktopName === 'function') app.setDesktopName('strok.desktop');
+}
 
 // Limites de sécurité sur les payloads IPC (anti-DoS mémoire / fichiers géants).
 const MAX_PROJECT_BYTES = 256 * 1024 * 1024; // 256 Mo de JSON .strok
@@ -124,6 +143,20 @@ function hardenContents(contents) {
 // Durcit TOUT webContents créé (fenêtre principale incluse).
 app.on('web-contents-created', (_event, contents) => hardenContents(contents));
 
+// Icône de la fenêtre. Windows : déjà embarquée dans l'.exe. macOS : fournie
+// par le bundle .app. Linux : rien ne la fournit — sans ce paramètre, la barre
+// des tâches et Alt+Tab affichent l'icône Electron par défaut. Le PNG est copié
+// hors de l'asar par electron-builder (linux.extraResources).
+function windowIcon() {
+  if (isMac) return undefined;
+  if (isLinux) {
+    return app.isPackaged
+      ? path.join(process.resourcesPath, 'icon.png')
+      : path.join(__dirname, '..', 'build', 'icons', '256x256.png');
+  }
+  return isDev ? undefined : path.join(__dirname, '..', 'build', 'icon.ico');
+}
+
 // ───────────────────────── Fenêtre ─────────────────────────
 function createWindow() {
   // La fenêtre peut être recréée via le Dock (macOS) : le flush de session
@@ -143,8 +176,7 @@ function createWindow() {
       : { frame: false }),
     backgroundColor: '#0d0d0d',
     autoHideMenuBar: true,
-    // macOS : l'icône vient du bundle .app (le paramètre est ignoré/inutile).
-    icon: isDev || isMac ? undefined : path.join(__dirname, '..', 'build', 'icon.ico'),
+    icon: windowIcon(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       // ── Isolation maximale du renderer ──

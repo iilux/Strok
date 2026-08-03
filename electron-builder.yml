@@ -36,6 +36,46 @@ mac:
   category: public.app-category.graphics-design
   artifactName: ${productName}-${version}-${arch}.${ext}
 
+# Linux : .deb pour la famille Debian/Ubuntu/Mint (intégration menu + icône +
+# lien /usr/bin/strok) et AppImage universel (portable, aucune installation).
+linux:
+  target:
+    - target: deb
+      arch:
+        - x64
+    - target: AppImage
+      arch:
+        - x64
+  # Jeu de tailles (16→512) et non le seul 1024×1024 : le thème d'icônes
+  # hicolor ne référence pas ce format, l'icône du menu resterait vide.
+  icon: build/icons
+  # Nom du binaire (et donc du .desktop, du lien /usr/bin et du WM_CLASS) :
+  # minuscules, comme le veut la convention Linux.
+  executableName: strok
+  category: Graphics
+  packageCategory: graphics
+  synopsis: Application de dessin et de croquis
+  maintainer: Strok <iilux@users.noreply.github.com>
+  desktop:
+    # Associe la fenêtre à ce .desktop (WM_CLASS posé par Electron depuis le nom
+    # de l'app, cf. `app.setName` dans main.cjs). Sans cette clé, la barre des
+    # tâches de Cinnamon/GNOME affiche une icône générique.
+    StartupWMClass: Strok
+    Keywords: dessin;croquis;draw;paint;sketch;canvas;
+  # Sous Linux, aucune métadonnée du binaire ne fournit l'icône de fenêtre
+  # (Alt+Tab, barre des tâches) : main.cjs la passe à BrowserWindow, il faut
+  # donc que le PNG existe hors de l'asar. 256 px suffit largement — le
+  # 1024×1024 ferait transiter 4 Mo de pixels vers le gestionnaire de fenêtres.
+  extraResources:
+    - from: build/icons/256x256.png
+      to: icon.png
+
+deb:
+  priority: optional
+  # Remplace le post-install par défaut d'electron-builder pour installer
+  # chrome-sandbox en SUID root dans tous les cas (cf. commentaire du script).
+  afterInstall: build/deb-after-install.tpl
+
 nsis:
   oneClick: false
   perMachine: false

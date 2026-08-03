@@ -42,8 +42,12 @@
   --radius: 8px;
   --radius-sm: 6px;
 
+  /* Piles de polices par OS : Windows (Segoe), macOS (-apple-system),
+     Linux (Ubuntu/Cantarell/Noto/DejaVu — présentes sur Mint et dérivés). */
   --font: 'Inter', 'Segoe UI Variable', 'Segoe UI', system-ui, -apple-system,
-    sans-serif;
+    'Ubuntu', 'Cantarell', 'Noto Sans', 'DejaVu Sans', sans-serif;
+  --font-mono: 'Cascadia Code', 'Consolas', 'SF Mono', 'Menlo',
+    'Ubuntu Mono', 'DejaVu Sans Mono', 'Liberation Mono', monospace;
 
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -686,7 +690,7 @@ button {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-bright);
-  font-family: 'Cascadia Code', 'Consolas', 'SF Mono', 'Menlo', monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   padding: 6px 9px;
   outline: none;
@@ -1105,7 +1109,7 @@ button {
 }
 .addon-empty code,
 .addon-row__file code {
-  font-family: 'Cascadia Code', 'Consolas', 'SF Mono', 'Menlo', monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   background: var(--surface-input);
   padding: 1px 5px;
@@ -1165,7 +1169,7 @@ button {
   margin-top: 6px;
 }
 .addon-row__file {
-  font-family: 'Cascadia Code', 'Consolas', 'SF Mono', 'Menlo', monospace;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   color: var(--text-dim);
   margin-top: 7px;
@@ -1307,7 +1311,7 @@ button {
   border: 1px solid var(--border-strong);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.55);
   color: var(--text-bright);
-  font-family: 'Cascadia Code', 'Consolas', 'SF Mono', 'Menlo', monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1;
 }
@@ -1632,7 +1636,7 @@ button {
   background: var(--surface-input);
   border: 1px solid var(--border);
   color: var(--text-bright);
-  font-family: 'Cascadia Code', 'Consolas', 'SF Mono', 'Menlo', monospace;
+  font-family: var(--font-mono);
   text-align: right;
   overflow: hidden;
   text-overflow: ellipsis;
