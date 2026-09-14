@@ -11,6 +11,20 @@ const MIN_SIZE = 1;
 const MAX_SIZE = 100;
 const clampSize = (s) => Math.max(MIN_SIZE, Math.min(MAX_SIZE, s));
 
+// macOS : le trackpad est le périphérique principal, la molette suit donc ses
+// conventions (défiler = déplacer, pincer = zoomer). Windows/Linux inchangés.
+const IS_MAC =
+  typeof window !== 'undefined' && window.strok?.platform === 'darwin';
+
+// Sensibilités macOS, par pixel de delta `wheel` (à ajuster au ressenti).
+// Pincer : Chromium le traduit en `wheel` avec ctrlKey et de petits deltas,
+// d'où une sensibilité plus forte que pour le défilement.
+const PINCH_ZOOM_SPEED = 0.01;
+const SCROLL_ZOOM_SPEED = 0.003; // ⌥ + défiler
+const SCROLL_SIZE_SPEED = 0.005; // ⌘ + défiler
+// Silence (ms) au-delà duquel un événement `wheel` ouvre un nouveau geste.
+const WHEEL_GESTURE_GAP = 120;
+
 function Canvas(
   {
     id,
@@ -93,17 +107,19 @@ function Canvas(
     ]
   );
 
-  // Refs « live » pour les handlers liés une seule fois (molette, rAF).
+  // Refs « live » pour les handlers liés une seule fois (molette, clavier, rAF).
   const zoomRef = useRef(zoom);
   const panRef = useRef({ x: panX, y: panY });
   const viewChangeRef = useRef(onViewChange);
   const sizeRef = useRef(size);
   const sizeChangeRef = useRef(onSizeChange);
+  const activeRef = useRef(active);
   zoomRef.current = zoom;
   panRef.current = { x: panX, y: panY };
   viewChangeRef.current = onViewChange;
   sizeRef.current = size;
   sizeChangeRef.current = onSizeChange;
+  activeRef.current = active;
 
   // --- Coalescence des changements de vue sur un frame ---
   // Molette et pan peuvent émettre bien plus de 60 événements/s (souris gaming,
@@ -162,16 +178,34 @@ function Canvas(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clearSignal]);
 
-  // Molette simple => zoom (vers le curseur) ; Ctrl+molette => taille du
-  // pinceau/gomme. Les deux sont volontairement séparés pour ne pas se gêner.
+  // Zoom d'un facteur `factor` centré sur un point écran. On part de la vue
+  // effective (changements en attente inclus) pour ne perdre aucun cran.
+  const zoomAround = (clientX, clientY, factor) => {
+    const { zoom: z1, panX: px, panY: py } = currentView();
+    const rect = getStageRect();
+    if (!rect) return;
+    const cx = clientX - rect.left;
+    const cy = clientY - rect.top;
+    const z2 = clampZoom(z1 * factor);
+    if (z2 === z1) return;
+    const k = z2 / z1;
+    queueViewChange({
+      zoom: z2,
+      panX: cx - (cx - px) * k,
+      panY: cy - (cy - py) * k,
+    });
+  };
+
+  // Geste molette/trackpad en cours (macOS) : { mode, t, size }.
+  const wheelGesture = useRef(null);
+
   useEffect(() => {
     const stage = wrapRef.current;
     if (!stage) return;
 
-    const onWheel = (e) => {
-      e.preventDefault();
-
-      // Ctrl+molette : ajuste la taille du pinceau/gomme (pas de zoom).
+    // Windows / Linux — molette simple => zoom (vers le curseur) ; Ctrl+molette
+    // => taille du pinceau/gomme. Les deux sont volontairement séparés.
+    const onWheelDefault = (e) => {
       if (e.ctrlKey || e.metaKey) {
         const cur = sizeRef.current;
         const dir = e.deltaY < 0 ? 1 : -1; // molette vers le haut => plus gros
@@ -180,22 +214,62 @@ function Canvas(
         if (next !== cur) sizeChangeRef.current?.(next);
         return;
       }
+      zoomAround(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015));
+    };
 
-      // Molette simple : zoom centré sur le curseur. On part de la vue
-      // effective (changements en attente inclus) pour ne perdre aucun cran.
-      const { zoom: z1, panX: px, panY: py } = currentView();
-      const rect = getStageRect();
-      if (!rect) return;
-      const cx = e.clientX - rect.left;
-      const cy = e.clientY - rect.top;
-      const z2 = clampZoom(z1 * Math.exp(-e.deltaY * 0.0015));
-      if (z2 === z1) return;
-      const k = z2 / z1;
-      queueViewChange({
-        zoom: z2,
-        panX: cx - (cx - px) * k,
-        panY: cy - (cy - py) * k,
-      });
+    // macOS — défiler (2 doigts ou molette) => pan ; pincer => zoom ;
+    // ⌥+défiler => zoom (souris) ; ⌘+défiler => taille du pinceau/gomme.
+    // Le pincement arrive en `wheel` avec ctrlKey : Ctrl ne peut donc pas servir
+    // de modificateur. Un geste trackpad émet des dizaines de petits deltas
+    // (inertie comprise) : chaque action est proportionnelle au delta.
+    const onWheelMac = (e) => {
+      const prev = wheelGesture.current;
+      let g;
+      if (e.ctrlKey) {
+        g = { mode: 'pinch' };
+      } else if (
+        prev &&
+        prev.mode !== 'pinch' &&
+        e.timeStamp - prev.t < WHEEL_GESTURE_GAP
+      ) {
+        // Mode figé jusqu'à la fin du geste : relâcher ⌘/⌥ pendant l'inertie
+        // ne doit pas basculer brusquement en pan.
+        g = prev;
+      } else {
+        g = {
+          mode: e.metaKey ? 'size' : e.altKey ? 'zoom' : 'pan',
+          size: sizeRef.current,
+        };
+      }
+      g.t = e.timeStamp;
+      wheelGesture.current = g;
+
+      if (g.mode === 'size') {
+        // Taille non arrondie cumulée sur le geste : sinon les petits deltas du
+        // trackpad seraient perdus à l'arrondi.
+        g.size = clampSize(g.size * Math.exp(-e.deltaY * SCROLL_SIZE_SPEED));
+        const next = Math.round(g.size);
+        if (next !== sizeRef.current) sizeChangeRef.current?.(next);
+        return;
+      }
+
+      // Pas de pan/zoom pendant un trait : son repère écran est figé au
+      // pointerdown, le tracé se décalerait.
+      if (isDrawing()) return;
+
+      if (g.mode === 'pan') {
+        const { panX: px, panY: py } = currentView();
+        queueViewChange({ panX: px - e.deltaX, panY: py - e.deltaY });
+      } else {
+        const speed = g.mode === 'pinch' ? PINCH_ZOOM_SPEED : SCROLL_ZOOM_SPEED;
+        zoomAround(e.clientX, e.clientY, Math.exp(-e.deltaY * speed));
+      }
+    };
+
+    const onWheel = (e) => {
+      e.preventDefault();
+      if (IS_MAC) onWheelMac(e);
+      else onWheelDefault(e);
     };
 
     stage.addEventListener('wheel', onWheel, { passive: false });
@@ -203,11 +277,16 @@ function Canvas(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wrapRef]);
 
-  // --- Pan par glisser au clic-molette (bouton du milieu) ---
+  // --- Pan par glisser : clic-molette, ou Espace maintenu + clic gauche ---
+  // (Espace remplace le bouton du milieu sur trackpad et Magic Mouse.)
   const panning = useRef(null);
+  const spaceHeld = useRef(false);
+  const hovered = useRef(false); // pointeur au-dessus de la toile
   const onStagePointerDownCapture = (e) => {
-    if (e.button !== 1) return; // bouton du milieu uniquement
+    const spacePan = e.button === 0 && spaceHeld.current;
+    if (e.button !== 1 && !spacePan) return;
     e.preventDefault();
+    e.stopPropagation(); // ce clic sert au pan : pas de trait
     const v = currentView();
     panning.current = { cx: e.clientX, cy: e.clientY, panX: v.panX, panY: v.panY };
     stageCursor(true);
@@ -232,6 +311,40 @@ function Canvas(
     if (s) s.classList.toggle('is-panning', grabbing);
   };
 
+  // Espace maintenu au-dessus de la toile active => mode « main ». Ailleurs,
+  // Espace garde son rôle normal (activer un bouton, taper dans un champ).
+  useEffect(() => {
+    const setPanReady = (on) => {
+      spaceHeld.current = on;
+      wrapRef.current?.classList.toggle('is-pan-ready', on);
+    };
+    const onDown = (e) => {
+      if (e.code !== 'Space' || !activeRef.current || !hovered.current) return;
+      const el = e.target;
+      if (
+        el &&
+        (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+      )
+        return;
+      e.preventDefault(); // n'active pas le bouton qui a le focus
+      if (!spaceHeld.current) setPanReady(true);
+    };
+    const onUp = (e) => {
+      if (e.code !== 'Space' || !spaceHeld.current) return;
+      e.preventDefault();
+      setPanReady(false);
+    };
+    const onBlur = () => setPanReady(false);
+    window.addEventListener('keydown', onDown);
+    window.addEventListener('keyup', onUp);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onDown);
+      window.removeEventListener('keyup', onUp);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, [wrapRef]);
+
   // Anneau de curseur (hors viewport => bordure nette), taille = pinceau * zoom.
   const moveCursor = (e) => {
     const stage = wrapRef.current;
@@ -253,10 +366,34 @@ function Canvas(
     }px)`;
   };
   const showCursor = () => {
+    hovered.current = true;
     stageRectRef.current = null; // la fenêtre a pu bouger : rafraîchit le cache
     if (cursorRef.current) cursorRef.current.style.opacity = '1';
   };
-  const hideCursor = () => cursorRef.current && (cursorRef.current.style.opacity = '0');
+  const hideCursor = () => {
+    hovered.current = false;
+    if (cursorRef.current) cursorRef.current.style.opacity = '0';
+  };
+
+  // Toute la toile reçoit les événements de dessin, pas seulement l'overlay :
+  // après un pan ou un dézoom, une partie de la vue peut sortir du document
+  // déjà alloué (useCanvas l'agrandit au pointerdown).
+  const onStagePointerDown = (e) => {
+    if (panning.current) return;
+    handlers.onPointerDown(e);
+  };
+  const onStagePointerMove = (e) => {
+    moveCursor(e);
+    handlers.onPointerMove(e);
+  };
+  const onStagePointerUp = (e) => {
+    endPan(e);
+    handlers.onPointerUp(e);
+  };
+  const onStagePointerCancel = (e) => {
+    endPan(e);
+    handlers.onPointerCancel(e);
+  };
 
   // Zoom via boutons : autour du centre de la vue.
   const zoomBy = (factor) => {
@@ -279,9 +416,10 @@ function Canvas(
         className={`canvas-stage${darkCanvas ? ' is-dark' : ''}`}
         ref={wrapRef}
         onPointerDownCapture={onStagePointerDownCapture}
-        onPointerMove={moveCursor}
-        onPointerUp={endPan}
-        onPointerCancel={endPan}
+        onPointerDown={onStagePointerDown}
+        onPointerMove={onStagePointerMove}
+        onPointerUp={onStagePointerUp}
+        onPointerCancel={onStagePointerCancel}
         onPointerEnter={showCursor}
         onPointerLeave={hideCursor}
       >
@@ -292,11 +430,7 @@ function Canvas(
           }}
         >
           <canvas ref={mainRef} className="canvas-layer canvas-main" />
-          <canvas
-            ref={overlayRef}
-            className="canvas-layer canvas-overlay"
-            {...handlers}
-          />
+          <canvas ref={overlayRef} className="canvas-layer canvas-overlay" />
         </div>
 
         <div

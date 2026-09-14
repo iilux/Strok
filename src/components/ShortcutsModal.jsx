@@ -11,10 +11,23 @@ import { Keyboard, X } from 'lucide-react';
 
 // Touche de commande selon l'OS : ⌘ sur macOS, Ctrl ailleurs (les gestionnaires
 // clavier testent déjà `ctrlKey || metaKey`, seul l'affichage change).
-const MOD =
-  typeof window !== 'undefined' && window.strok?.platform === 'darwin'
-    ? '⌘'
-    : 'Ctrl';
+const IS_MAC =
+  typeof window !== 'undefined' && window.strok?.platform === 'darwin';
+const MOD = IS_MAC ? '⌘' : 'Ctrl';
+
+// Molette / trackpad : sur macOS, défiler déplace la toile et pincer zoome
+// (cf. Canvas.jsx) ; ailleurs, la molette zoome.
+const WHEEL_ITEMS = IS_MAC
+  ? [
+      { keys: ['Pincer'], desc: 'Zoomer / dézoomer (vers le curseur)' },
+      { keys: ['Défiler'], desc: 'Déplacer la toile (2 doigts ou molette)' },
+      { keys: ['⌥', 'Défiler'], desc: 'Zoomer / dézoomer (souris)' },
+      { keys: [MOD, 'Défiler'], desc: 'Taille du pinceau / gomme' },
+    ]
+  : [
+      { keys: ['Molette'], desc: 'Zoomer / dézoomer (vers le curseur)' },
+      { keys: [MOD, 'Molette'], desc: 'Taille du pinceau / gomme' },
+    ];
 
 // Groupes de raccourcis affichés. Reste aligné avec le tableau du README.
 const GROUPS = [
@@ -52,8 +65,8 @@ const GROUPS = [
     title: 'Vue',
     items: [
       { keys: [MOD, '0'], desc: 'Réinitialiser le zoom' },
-      { keys: ['Molette'], desc: 'Zoomer / dézoomer (vers le curseur)' },
-      { keys: [MOD, 'Molette'], desc: 'Taille du pinceau / gomme' },
+      ...WHEEL_ITEMS,
+      { keys: ['Espace'], hold: true, desc: 'Glisser pour déplacer la toile' },
       { keys: ['Clic-molette'], hold: true, desc: 'Déplacer la toile (pan)' },
     ],
   },

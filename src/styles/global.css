@@ -498,15 +498,24 @@ button {
   display: block;
   touch-action: none;
 }
+/* Curseur système masqué sur toute la toile (y compris hors du document déjà
+   alloué) : on affiche l'anneau custom à la place. */
+.canvas-stage,
 .canvas-overlay {
-  cursor: none; /* on affiche l'anneau custom à la place */
+  cursor: none;
 }
 
-/* Pan en cours (clic-molette) : main fermée + on masque l'anneau de pinceau. */
+/* Espace maintenu : main ouverte. Pan en cours (clic-molette ou Espace +
+   glisser) : main fermée. L'anneau de pinceau est masqué dans les deux cas. */
+.canvas-stage.is-pan-ready,
+.canvas-stage.is-pan-ready .canvas-overlay {
+  cursor: grab;
+}
 .canvas-stage.is-panning,
 .canvas-stage.is-panning .canvas-overlay {
   cursor: grabbing;
 }
+.canvas-stage.is-pan-ready .brush-cursor,
 .canvas-stage.is-panning .brush-cursor {
   opacity: 0 !important;
 }

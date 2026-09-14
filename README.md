@@ -47,7 +47,8 @@ npm run icon     # regenerate build/icon.ico (256px), build/icon.png (1024px)
 - **Dark layer mode**: paper tinted like the app menus (not black),
   the pencil automatically switches to a coordinated light grey.
 - **Zoom / unzoom**: `scroll wheel` (toward cursor), `−` / `+` buttons,
-  click on `%` to reset; pan with **middle-click drag**.
+  click on `%` to reset; pan with **middle-click drag** or **`Space` + drag**.
+  On macOS, trackpad-native: **two-finger scroll pans**, **pinch zooms**.
 - **Custom titlebar** (minimize / maximize / close) + **cursor ring**
   showing brush size (follows zoom).
 - **Shortcuts cheat sheet**: a **?** button in the titlebar (just next to
@@ -83,12 +84,20 @@ npm run icon     # regenerate build/icon.ico (256px), build/icon.png (1024px)
 | `Ctrl + T` | New tab |
 | `Ctrl + W` | Close active tab |
 | `Ctrl + 0` | Reset zoom |
-| `scroll wheel` | Zoom in / out (toward cursor) |
+| `scroll wheel` | Zoom in / out (toward cursor) — Windows / Linux |
 | `Ctrl + scroll wheel` | Brush / eraser size |
 | `middle-click drag` | Pan the canvas |
+| `Space` (held) + drag | Pan the canvas (trackpad, mouse without middle button) |
 
 > 🍎 On **macOS**, use `Cmd (⌘)` instead of `Ctrl` — the in-app cheat sheet
-> adapts automatically.
+> adapts automatically. Scrolling follows trackpad conventions there:
+
+| macOS gesture | Action |
+| --- | --- |
+| Pinch | Zoom in / out (toward cursor) |
+| Two-finger scroll (or scroll wheel) | Pan the canvas |
+| `⌥ + scroll` | Zoom in / out (handy with a mouse) |
+| `⌘ + scroll` | Brush / eraser size |
 
 > 💡 This same list is available **inside the app** via the **?** button in the
 > titlebar — see [Shortcuts cheat sheet](#shortcuts-cheat-sheet).
